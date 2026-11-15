@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -72,3 +73,36 @@ class TestWindow:
     def test_window_must_divide_day(self) -> None:
         with pytest.raises(ValueError, match="does not divide a day"):
             window_start(datetime(2026, 11, 15, tzinfo=UTC), 7 * 60)
+
+
+ADELAIDE = ZoneInfo("Australia/Adelaide")  # UTC+9:30 in November (daylight saving: +10:30)
+BRUSSELS = ZoneInfo("Europe/Brussels")
+
+
+class TestLocalAlignment:
+    def test_hourly_window_follows_the_local_clock_in_a_half_hour_zone(self) -> None:
+        now = datetime(2026, 6, 15, 10, 40, tzinfo=ADELAIDE)  # +9:30 in June
+        assert window_start(now, 3600) == datetime(2026, 6, 15, 10, 0, tzinfo=ADELAIDE)
+        assert seconds_in_window(now, 3600) == 40 * 60
+
+    def test_quarter_window_follows_the_local_clock(self) -> None:
+        now = datetime(2026, 6, 15, 10, 52, tzinfo=ADELAIDE)
+        assert window_start(now, 900) == datetime(2026, 6, 15, 10, 45, tzinfo=ADELAIDE)
+
+    def test_repeated_hour_when_dst_ends(self) -> None:
+        """02:00-03:00 happens twice on 25/10/2026 in Brussels: each is its own window."""
+        first = datetime(2026, 10, 25, 2, 20, tzinfo=BRUSSELS, fold=0)  # CEST, 00:20 UTC
+        second = datetime(2026, 10, 25, 2, 20, tzinfo=BRUSSELS, fold=1)  # CET, 01:20 UTC
+        assert window_start(first, 900) == datetime(2026, 10, 25, 0, 15, tzinfo=UTC)
+        assert window_start(second, 900) == datetime(2026, 10, 25, 1, 15, tzinfo=UTC)
+        assert window_start(first, 3600) != window_start(second, 3600)
+        assert seconds_in_window(second, 900) == 5 * 60
+
+    def test_skipped_hour_when_dst_starts(self) -> None:
+        now = datetime(2026, 3, 29, 3, 5, tzinfo=BRUSSELS)  # just after 02:00 became 03:00
+        assert window_start(now, 900) == datetime(2026, 3, 29, 3, 0, tzinfo=BRUSSELS)
+        assert seconds_in_window(now, 900) == 5 * 60
+
+    def test_naive_datetimes_are_rejected(self) -> None:
+        with pytest.raises(ValueError, match="time zone"):
+            window_start(datetime(2026, 11, 15, 3, 5), 900)  # noqa: DTZ001

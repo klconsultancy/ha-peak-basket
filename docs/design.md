@@ -56,7 +56,8 @@ for the grid operator, it makes no difference.
 2. **Decide on measurements, never on status texts.** A load runs when its measured power
    is above 100 W, not when its status says "charging".
 3. **Tariff is not engine.** Region rules are data (profiles); the engine is generic.
-4. **Windows are clock blocks**, not a sliding average.
+4. **Windows are clock blocks** of the local clock (Home Assistant's time zone), not a sliding
+   average. The hour that repeats when daylight saving time ends has windows of its own.
 5. **Missing or stale data gives a safe, lower limit**, never "unlimited".
 6. **No API of its own, no required external system.** EVCC is one consumer, not a
    requirement.
