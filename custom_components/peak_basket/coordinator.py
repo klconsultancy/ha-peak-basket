@@ -78,14 +78,14 @@ class PeakBasketCoordinator(DataUpdateCoordinator[ModelResult]):
         self.peak_goal_w = opts[CONF_PEAK_GOAL]
         self.target_w = self.peak_goal_w
         self._max_age = timedelta(seconds=opts[CONF_MAX_AGE])
-        self._window_start = window_start(dt_util.utcnow(), self.profile.window_s)
+        self._window_start = window_start(dt_util.now(), self.profile.window_s)
         self._counter_start_wh: float | None = None
         self._last_counter: tuple[float, datetime] | None = None
         self._unsubs: list[CALLBACK_TYPE] = []
 
     async def async_start(self) -> None:
         """Restore the running window, subscribe to the grid power and evaluate once."""
-        self._window_start = window_start(dt_util.utcnow(), self.profile.window_s)
+        self._window_start = window_start(dt_util.now(), self.profile.window_s)
         if not self._src.get(CONF_WINDOW_AVERAGE):
             self._counter_start_wh = await self._async_counter_at(self._window_start)
             if self._counter_start_wh is None:
@@ -116,7 +116,7 @@ class PeakBasketCoordinator(DataUpdateCoordinator[ModelResult]):
 
     @callback
     def _evaluate(self) -> None:
-        now = dt_util.utcnow()
+        now = dt_util.now()
         start = window_start(now, self.profile.window_s)
         used_wh = self._used_wh(start, now)
 
