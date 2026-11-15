@@ -17,7 +17,7 @@
         "data_description": {
           "grid_power": "Instantaneous grid power, import positive (e.g. P1 meter). Export may be negative.",
           "pv_power": "Instantaneous solar production. Adds the window's solar and grid energy per load and for the house. Export is read from a negative grid power.",
-          "window_average": "The meter's running average for the current window (e.g. HomeWizard “average demand”, DSMR 1.4.0). Preferred over the import counter: exact and right after a restart.",
+          "window_average": "The meter's running average for the current window (e.g. HomeWizard “average demand”, DSMR 1.4.0). It must average over the region's window (15 minutes in Flanders) and drop back to about 0 at every window start; a 5-minute average or an hourly one gives a wrong budget. Preferred over the import counter: exact, also right after a restart.",
           "grid_import_energy": "Import register (1.8.x) as a total-increasing energy counter. Used when no window average is set.",
           "month_peak": "Highest window average this month; the target never goes below it.",
           "meter_voltages": "Voltage per phase at the meter, in order L1, L2, L3. Used for every load whose own voltage is missing; otherwise 230 V is assumed."
