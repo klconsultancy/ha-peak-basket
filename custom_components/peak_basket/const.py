@@ -12,6 +12,7 @@ SUBENTRY_LOAD = "load"
 # Config entry data: the grid connection's sources
 CONF_PROFILE = "profile"
 CONF_GRID_POWER = "grid_power"
+CONF_PV_POWER = "pv_power"
 CONF_WINDOW_AVERAGE = "window_average"
 CONF_GRID_IMPORT_ENERGY = "grid_import_energy"
 CONF_MONTH_PEAK = "month_peak"

@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta
 from functools import partial
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from homeassistant.components.recorder import history
 from homeassistant.config_entries import ConfigEntry
@@ -41,6 +41,7 @@ from .const import (
     CONF_PEAK_GOAL,
     CONF_PRIORITY,
     CONF_PROFILE,
+    CONF_PV_POWER,
     CONF_REACTION,
     CONF_WINDOW_AVERAGE,
     DEFAULT_ENTRY_OPTIONS,
@@ -50,7 +51,15 @@ from .const import (
     SUBENTRY_LOAD,
     TICK_SECONDS,
 )
-from .model import PROFILES, ModelInput, ModelParams, ModelResult, compute_target, evaluate
+from .model import (
+    PROFILES,
+    ModelInput,
+    ModelParams,
+    ModelResult,
+    allocate_solar,
+    compute_target,
+    evaluate,
+)
 from .model.window import window_start
 
 if TYPE_CHECKING:
@@ -93,6 +102,23 @@ class PeakBasketData:
     """The basket with every load taken out of the house; its mode and limits mean nothing."""
     loads: dict[str, ModelResult]
     """By subentry id."""
+    flows: Flows | None = None
+    """The window's solar and grid energy so far; None without a PV source."""
+
+
+@dataclass(frozen=True)
+class Flows:
+    """Energy this window (Wh): solar to the loads first, in priority order, then the house.
+
+    A display convention: physically, and for the grid operator, it makes no difference.
+    """
+
+    solar: float = 0.0
+    export: float = 0.0
+    house_solar: float = 0.0
+    house_grid: float = 0.0
+    load_solar: dict[str, float] = field(default_factory=dict)
+    load_grid: dict[str, float] = field(default_factory=dict)
 
 
 class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
@@ -122,6 +148,9 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
         self._counter_start_wh: float | None = None
         self._last_counter: tuple[float, datetime] | None = None
         self._published_at = dt_util.now()
+        self._flows = Flows()
+        self._flows_window = self._window_start
+        self._last_powers: tuple[datetime, list[float | None]] | None = None
         self._unsubs: list[CALLBACK_TYPE] = []
 
     async def async_start(self) -> None:
@@ -214,7 +243,11 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
                 load.params,
             )
 
-        data = PeakBasketData(connection=connection, loads=results)
+        flows = None
+        if pv_entity := self._src.get(CONF_PV_POWER):
+            pv = self._power_w(str(pv_entity), now)
+            flows = self._integrate(start, now, [grid, pv, *powers])
+        data = PeakBasketData(connection=connection, loads=results, flows=flows)
         if force or self._must_publish(data, now):
             self._published_at = now
             self.async_set_updated_data(data)
@@ -231,6 +264,49 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
             ):
                 return True
         return False
+
+    def _integrate(self, start: datetime, now: datetime, powers: list[float | None]) -> Flows:
+        """Add the interval since the previous evaluation to the window's flows.
+
+        ``powers`` is grid, PV, then each load in priority order. The interval counts at
+        the powers reported at its start, and only when they were all known and the
+        interval is no longer than the maximum source age: a gap is not filled in.
+        """
+        if start != self._flows_window:
+            self._flows_window = start
+            self._flows = Flows()
+        elif self._last_powers is not None:
+            since, (grid, pv, *loads) = self._last_powers
+            hours = (now - since).total_seconds() / SECONDS_PER_HOUR
+            if (
+                grid is not None
+                and pv is not None
+                and None not in loads
+                and now - since <= self._max_age
+            ):
+                known = cast("list[float]", loads)
+                split = allocate_solar(
+                    solar=pv, export=max(-grid, 0.0), grid_import=grid, loads=known
+                )
+                ids = [load.subentry_id for load in self.loads]
+                f = self._flows
+                self._flows = replace(
+                    f,
+                    solar=f.solar + max(pv, 0.0) * hours,
+                    export=f.export + split.export * hours,
+                    house_solar=f.house_solar + split.house_solar * hours,
+                    house_grid=f.house_grid + split.house_grid * hours,
+                    load_solar={
+                        i: f.load_solar.get(i, 0.0) + s.solar * hours
+                        for i, s in zip(ids, split.loads, strict=True)
+                    },
+                    load_grid={
+                        i: f.load_grid.get(i, 0.0) + s.grid * hours
+                        for i, s in zip(ids, split.loads, strict=True)
+                    },
+                )
+        self._last_powers = (now, powers)
+        return self._flows
 
     def _used_wh(self, start: datetime, now: datetime) -> float | None:
         """Return the grid import since the window start.

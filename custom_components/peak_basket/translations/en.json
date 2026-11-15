@@ -8,6 +8,7 @@
           "name": "Name",
           "profile": "Tariff region",
           "grid_power": "Grid power",
+          "pv_power": "PV power (optional)",
           "window_average": "Window average power (recommended)",
           "grid_import_energy": "Grid import energy",
           "month_peak": "Monthly peak (optional)",
@@ -15,6 +16,7 @@
         },
         "data_description": {
           "grid_power": "Instantaneous grid power, import positive (e.g. P1 meter). Export may be negative.",
+          "pv_power": "Instantaneous solar production. Adds the window's solar and grid energy per load and for the house. Export is read from a negative grid power.",
           "window_average": "The meter's running average for the current window (e.g. HomeWizard “average demand”, DSMR 1.4.0). Preferred over the import counter: exact and right after a restart.",
           "grid_import_energy": "Import register (1.8.x) as a total-increasing energy counter. Used when no window average is set.",
           "month_peak": "Highest window average this month; the target never goes below it.",
@@ -179,6 +181,24 @@
       },
       "margin": {
         "name": "Margin"
+      },
+      "solar": {
+        "name": "Solar"
+      },
+      "export": {
+        "name": "Export"
+      },
+      "house_solar": {
+        "name": "House from solar"
+      },
+      "house_grid": {
+        "name": "House from grid"
+      },
+      "load_solar": {
+        "name": "From solar"
+      },
+      "load_grid": {
+        "name": "From grid"
       }
     }
   }
