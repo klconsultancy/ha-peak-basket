@@ -16,7 +16,7 @@ from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
-from .coordinator import PeakBasketConfigEntry, PeakBasketCoordinator
+from .coordinator import PeakBasketConfigEntry, PeakBasketCoordinator, floor_power
 from .model import Mode
 
 if TYPE_CHECKING:
@@ -36,8 +36,12 @@ class PeakBasketSensorDescription(SensorEntityDescription):
     value_fn: Callable[[PeakBasketCoordinator], float | str | None]
 
 
-def _round(value: float | None, digits: int = 0) -> float | None:
-    return None if value is None else round(value, digits)
+def _wh(value: float | None) -> float | None:
+    return None if value is None else round(value)
+
+
+def _w(value: float | None) -> float | None:
+    return None if value is None else floor_power(value)
 
 
 def _power(
@@ -49,7 +53,7 @@ def _power(
         device_class=SensorDeviceClass.POWER,
         native_unit_of_measurement=UnitOfPower.WATT,
         state_class=SensorStateClass.MEASUREMENT,
-        value_fn=lambda c: _round(value_fn(c)),
+        value_fn=lambda c: _w(value_fn(c)),
     )
 
 
@@ -65,7 +69,7 @@ def _budget(
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=0,
         entity_category=entity_category,
-        value_fn=lambda c: _round(value_fn(c), 1),
+        value_fn=lambda c: _wh(value_fn(c)),
     )
 
 
@@ -84,15 +88,15 @@ SENSORS: tuple[PeakBasketSensorDescription, ...] = (
         translation_key="charge_minutes",
         native_unit_of_measurement=UnitOfTime.MINUTES,
         state_class=SensorStateClass.MEASUREMENT,
-        suggested_display_precision=1,
-        value_fn=lambda c: _round(c.data.charge_minutes, 1),
+        suggested_display_precision=0,
+        value_fn=lambda c: round(c.data.charge_minutes),
     ),
     _power("target", lambda c: c.target_w),
     _power("house_power", lambda c: c.data.house_w),
     _budget("basket", lambda c: c.data.basket_wh),
     _budget("used", lambda c: c.data.used_wh),
     _budget("remaining", lambda c: c.data.remaining_wh),
-    _budget("house_reserve", lambda c: c.data.house_reserve_wh),
+    _budget("house_reserve", lambda c: c.data.house_reserve_wh, EntityCategory.DIAGNOSTIC),
     _budget("load_room", lambda c: c.data.load_room_wh),
     _budget("margin", lambda c: c.data.margin_wh, EntityCategory.DIAGNOSTIC),
 )

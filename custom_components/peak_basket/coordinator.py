@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from datetime import datetime, timedelta
 from functools import partial
 from typing import TYPE_CHECKING
@@ -54,6 +55,16 @@ if TYPE_CHECKING:
 type PeakBasketConfigEntry = ConfigEntry[PeakBasketCoordinator]
 
 SECONDS_PER_HOUR = 3600
+POWER_STEP_W = 10
+
+
+def floor_power(value: float) -> float:
+    """Round a power down to the published step, so it never exceeds the model's.
+
+    A unit conversion leaves noise such as 1649.9999999999998 W for 1.65 kW: that is
+    removed first, or it would round down a whole step.
+    """
+    return math.floor(round(value, 6) / POWER_STEP_W) * POWER_STEP_W
 
 
 class PeakBasketCoordinator(DataUpdateCoordinator[ModelResult]):
@@ -81,6 +92,7 @@ class PeakBasketCoordinator(DataUpdateCoordinator[ModelResult]):
         self._window_start = window_start(dt_util.now(), self.profile.window_s)
         self._counter_start_wh: float | None = None
         self._last_counter: tuple[float, datetime] | None = None
+        self._published_at: datetime | None = None
         self._unsubs: list[CALLBACK_TYPE] = []
 
     async def async_start(self) -> None:
@@ -108,14 +120,20 @@ class PeakBasketCoordinator(DataUpdateCoordinator[ModelResult]):
 
     @callback
     def _on_grid_change(self, _event: Event[EventStateChangedData]) -> None:
-        self._evaluate()
+        self._evaluate(force=False)
 
     @callback
     def _on_tick(self, _now: datetime) -> None:
         self._evaluate()
 
     @callback
-    def _evaluate(self) -> None:
+    def _evaluate(self, *, force: bool = True) -> None:
+        """Run the model; publish on every tick, between ticks only when a limit drops.
+
+        A meter can report every second, and every published change is a recorder row.
+        Between ticks a result waits, unless the mode changes or the grid limit or the
+        load's allowed power goes down: a consumer must learn that at once.
+        """
         now = dt_util.now()
         start = window_start(now, self.profile.window_s)
         used_wh = self._used_wh(start, now)
@@ -133,19 +151,30 @@ class PeakBasketCoordinator(DataUpdateCoordinator[ModelResult]):
             for i in range(max(len(primary), len(fallback)))
         ]
 
-        self.async_set_updated_data(
-            evaluate(
-                ModelInput(
-                    target_w=self.target_w,
-                    seconds_in_window=(now - start).total_seconds(),
-                    grid_import_w=self._power_w(self._entity(CONF_GRID_POWER), now),
-                    load_w=self._power_w(self._entity(CONF_LOAD_POWER), now),
-                    window_import_wh=used_wh,
-                    voltages=voltages or None,
-                ),
-                self.profile,
-                self.params,
-            )
+        result = evaluate(
+            ModelInput(
+                target_w=self.target_w,
+                seconds_in_window=(now - start).total_seconds(),
+                grid_import_w=self._power_w(self._entity(CONF_GRID_POWER), now),
+                load_w=self._power_w(self._entity(CONF_LOAD_POWER), now),
+                window_import_wh=used_wh,
+                voltages=voltages or None,
+            ),
+            self.profile,
+            self.params,
+        )
+        if force or self._must_publish(result, now):
+            self._published_at = now
+            self.async_set_updated_data(result)
+
+    def _must_publish(self, result: ModelResult, now: datetime) -> bool:
+        previous = self.data
+        return (
+            self._published_at is None
+            or now - self._published_at >= timedelta(seconds=TICK_SECONDS)
+            or result.mode != previous.mode
+            or floor_power(result.limit_w) < floor_power(previous.limit_w)
+            or floor_power(result.allowed_load_w) < floor_power(previous.allowed_load_w)
         )
 
     def _used_wh(self, start: datetime, now: datetime) -> float | None:

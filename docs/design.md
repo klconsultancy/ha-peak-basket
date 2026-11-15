@@ -134,6 +134,14 @@ Without the grid power, the load power or the used energy, the model falls back 
 static circuit at the goal: the load may use `goal - house`, or nothing when the house is
 unknown.
 
+### Publishing
+
+Every published change is a row in the recorder, and a meter can report every second. So
+powers are published rounded down to 10 W (never above the model's value), energies to
+1 Wh and minutes to whole minutes. The model runs on every grid-power update, but the
+sensors change at most once per 5 s tick, except when the mode changes or the grid limit
+or the load's allowed power goes down: those are published at once.
+
 `tests/test_jinja_parity.py` holds the model to the Jinja template it was ported from:
 6480 cases rendered by Home Assistant itself.
 

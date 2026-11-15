@@ -8,7 +8,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from homeassistant.config_entries import ConfigEntryState
+from homeassistant.const import EntityCategory
 from homeassistant.core import State
+from homeassistant.helpers import entity_registry as er
+
+from custom_components.peak_basket.const import DOMAIN
 
 from .conftest import (
     AVERAGE,
@@ -172,7 +176,7 @@ async def test_window_average_source_and_voltage_chain(
     entry = await setup_entry(hass, sources)
 
     assert value(hass, "mode") == "continuous"
-    assert float(value(hass, "used")) == pytest.approx(83.3, abs=0.1)
+    assert float(value(hass, "used")) == 83  # 83.3 Wh, published per Wh
     # (5400 W x 900 s - 300000 J) over the 600 s left.
     assert float(value(hass, "grid_limit")) == pytest.approx(7600, abs=1)
     assert entry.runtime_data.data.p_load_min_w == pytest.approx(6 * 696)
@@ -237,6 +241,68 @@ async def test_unload_stops_the_coordinator(
     assert not coordinator._unsubs  # noqa: SLF001
 
 
+async def _continuous_entry(hass: HomeAssistant, freezer: FrozenDateTimeFactory) -> None:
+    """Set up in continuous mode at 03:15:01, with its first publication at that moment."""
+    freezer.move_to("2026-11-15T03:14:59+00:00")
+    set_sources(hass, 1000, 100.0, 0)
+    await setup_entry(hass)
+    freezer.move_to("2026-11-15T03:15:01+00:00")
+    set_sources(hass, 1000, 100.0, 0)  # unchanged values fire no event: the tick evaluates
+    await tick(hass)
+    assert value(hass, "mode") == "continuous"
+
+
+async def test_values_are_rounded_so_small_changes_write_nothing(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    await _continuous_entry(hass, freezer)
+    assert float(value(hass, "house_power")) % 10 == 0
+    assert float(value(hass, "grid_limit")) % 10 == 0
+    assert float(value(hass, "used")) == int(float(value(hass, "used")))
+    assert float(value(hass, "charge_minutes")) == int(float(value(hass, "charge_minutes")))
+
+
+async def test_publishes_at_most_every_tick_while_nothing_drops(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    await _continuous_entry(hass, freezer)
+    # A meter reporting every second, with a slightly lower house load: the load may draw
+    # a little more, which can wait for the next tick.
+    freezer.move_to("2026-11-15T03:15:02+00:00")
+    hass.states.async_set(GRID, "900", {"unit_of_measurement": "W"})
+    await hass.async_block_till_done()
+    assert float(value(hass, "house_power")) == 1000  # not published yet
+    freezer.move_to("2026-11-15T03:15:06+00:00")
+    hass.states.async_set(GRID, "910", {"unit_of_measurement": "W"})
+    await hass.async_block_till_done()
+    assert float(value(hass, "house_power")) == 910
+
+
+async def test_a_lower_allowed_power_is_published_at_once(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    await _continuous_entry(hass, freezer)
+    allowed = float(value(hass, "allowed_load_power"))
+    freezer.move_to("2026-11-15T03:15:02+00:00")
+    hass.states.async_set(GRID, "3000", {"unit_of_measurement": "W"})
+    await hass.async_block_till_done()
+    assert float(value(hass, "allowed_load_power")) < allowed
+
+
+async def test_house_reserve_and_margin_are_diagnostic(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    await _continuous_entry(hass, freezer)
+    registry = er.async_get(hass)
+    (entry,) = hass.config_entries.async_entries(DOMAIN)
+    for key in ("house_reserve", "margin"):
+        entity_id = registry.async_get_entity_id("sensor", DOMAIN, f"{entry.entry_id}_{key}")
+        assert entity_id is not None
+        reg_entry = registry.async_get(entity_id)
+        assert reg_entry is not None
+        assert reg_entry.entity_category is EntityCategory.DIAGNOSTIC
+
+
 async def test_previous_windows_average_counts_as_nothing_used(
     hass: HomeAssistant, freezer: FrozenDateTimeFactory
 ) -> None:
@@ -257,7 +323,7 @@ async def test_previous_windows_average_counts_as_nothing_used(
     # New window, the average not yet reset: a grid update lands first.
     freezer.move_to("2026-11-15T03:15:01+00:00")
     hass.states.async_set(GRID, "5171", {"unit_of_measurement": "W"})
-    await hass.async_block_till_done()
+    await tick(hass)  # a higher limit waits for the tick
     assert float(value(hass, "used")) == 0
     assert value(hass, "mode") == "continuous"
     assert float(value(hass, "allowed_load_power")) > 4000
@@ -266,5 +332,5 @@ async def test_previous_windows_average_counts_as_nothing_used(
     freezer.move_to("2026-11-15T03:15:02+00:00")
     hass.states.async_set(AVERAGE, "3", {"unit_of_measurement": "W"})
     await tick(hass)
-    assert float(value(hass, "used")) == pytest.approx(0.8, abs=0.1)
+    assert float(value(hass, "used")) == 1  # 0.75 Wh, published per Wh
     assert value(hass, "mode") == "continuous"
