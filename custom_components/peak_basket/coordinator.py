@@ -320,9 +320,12 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
                 # loads after it must not count on the same room.
                 claimed += result.allowed_load_w
 
-        pv: float | None = 0.0
+        pv = 0.0
         if pv_entity := self._src.get(CONF_PV_POWER):
-            pv = self._power_w(str(pv_entity), now)
+            # Missing or stale PV counts as 0 W, like a load's power: an inverter that
+            # sleeps at night reports unavailable, and the loads' grid energy must still
+            # count. During a dropout it only moves solar to grid in the display.
+            pv = self._power_w(str(pv_entity), now) or 0.0
         self._integrate(start, now, [grid, pv, *powers])
         exported = None
         if export_entity := self._src.get(CONF_GRID_EXPORT_ENERGY):
@@ -385,7 +388,7 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
             self._sums = {}
         if self._last_powers is not None:
             since, (grid, pv, *loads) = self._last_powers
-            known = grid is not None and pv is not None and None not in loads
+            known = grid is not None and None not in loads
             if known and now - since <= self._max_age:
                 hours = (now - max(since, start)).total_seconds() / SECONDS_PER_HOUR
                 split = allocate_solar(

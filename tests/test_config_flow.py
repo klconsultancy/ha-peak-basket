@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any
 
 from homeassistant.config_entries import SOURCE_RECONFIGURE, SOURCE_USER
 from homeassistant.data_entry_flow import FlowResultType
+from homeassistant.helpers import entity_registry as er
 
 from custom_components.peak_basket.const import DEFAULT_ENTRY_OPTIONS, DEFAULT_LOAD, DOMAIN
 
@@ -11,6 +12,7 @@ from .conftest import EV, GRID, IMPORT, LOAD_NAME, SOURCES, set_sources, setup_e
 
 if TYPE_CHECKING:
     from freezegun.api import FrozenDateTimeFactory
+    from homeassistant.config_entries import ConfigEntry
     from homeassistant.core import HomeAssistant
 
 CONNECTION: dict[str, Any] = {
@@ -136,6 +138,78 @@ async def test_reconfigure_a_load(hass: HomeAssistant) -> None:
     load = entry.subentries[load.subentry_id]
     assert load.title == "Car"
     assert load.data["reaction_s"] == 30.0
+
+
+async def _reconfigure(
+    hass: HomeAssistant, entry: ConfigEntry, fields: dict[str, Any]
+) -> dict[str, Any]:
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": SOURCE_RECONFIGURE, "entry_id": entry.entry_id}
+    )
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "reconfigure"
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], fields)
+    await hass.async_block_till_done()
+    return dict(result)
+
+
+def _sensor_ids(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, str]:
+    registry = er.async_get(hass)
+    return {
+        e.unique_id: e.entity_id
+        for e in er.async_entries_for_config_entry(registry, entry.entry_id)
+    }
+
+
+async def test_reconfigure_adds_a_pv_source(hass: HomeAssistant) -> None:
+    set_sources(hass, 1000, 100.0, 0)
+    hass.states.async_set("sensor.pv_power", "0", {"unit_of_measurement": "W"})
+    entry = await setup_entry(hass)
+    before = _sensor_ids(hass, entry)
+    assert f"{entry.entry_id}_solar" not in before
+
+    result = await _reconfigure(
+        hass,
+        entry,
+        {"grid_power": GRID, "grid_import_energy": IMPORT, "pv_power": "sensor.pv_power"},
+    )
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+    assert entry.data["pv_power"] == "sensor.pv_power"
+    assert entry.data["profile"] == "be_flanders"
+    after = _sensor_ids(hass, entry)
+    assert f"{entry.entry_id}_solar" in after
+    # The sensors that were there keep their entity IDs.
+    assert {k: v for k, v in after.items() if k in before} == before
+
+
+async def test_reconfigure_removes_a_pv_source_and_its_sensors(hass: HomeAssistant) -> None:
+    set_sources(hass, 1000, 100.0, 0)
+    hass.states.async_set("sensor.pv_power", "0", {"unit_of_measurement": "W"})
+    entry = await setup_entry(hass, {**SOURCES, "pv_power": "sensor.pv_power"})
+    (load,) = entry.subentries
+    assert f"{entry.entry_id}_{load}_load_solar" in _sensor_ids(hass, entry)
+
+    await _reconfigure(hass, entry, {"grid_power": GRID, "grid_import_energy": IMPORT})
+    assert "pv_power" not in entry.data
+    after = _sensor_ids(hass, entry)
+    for unique_id in (
+        f"{entry.entry_id}_solar",
+        f"{entry.entry_id}_house_solar",
+        f"{entry.entry_id}_export",
+        f"{entry.entry_id}_{load}_load_solar",
+    ):
+        assert unique_id not in after
+    assert f"{entry.entry_id}_{load}_load_grid" in after
+
+
+async def test_reconfigure_refuses_what_setup_refuses(hass: HomeAssistant) -> None:
+    set_sources(hass, 1000, 100.0, 0)
+    entry = await setup_entry(hass)
+    result = await _reconfigure(hass, entry, {"grid_power": GRID})
+    assert result["errors"] == {"base": "no_energy_source"}
+    result = await _reconfigure(hass, entry, {"grid_power": EV, "grid_import_energy": IMPORT})
+    assert result["errors"] == {"grid_power": "grid_is_a_load"}
 
 
 def test_demand_comes_right_after_priority() -> None:

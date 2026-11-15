@@ -46,7 +46,25 @@ the export counter.
 
 ## Installation
 
-Peak Basket installs through [HACS](https://hacs.xyz/) as a custom repository:
+Peak Basket is a custom repository. From Home Assistant 2026.11 it installs through the
+built-in **Marketplace**; on 2026.10 through [HACS](https://hacs.xyz/). Both install the
+same release zip.
+
+### Marketplace (Home Assistant 2026.11 and later)
+
+1. Go to **Settings → Marketplace** and select **Add from link** in the upper-right corner.
+2. Under **GitHub link**, enter `klconsultancy/ha-peak-basket` and select **Add**. The first
+   time, the Marketplace asks you to connect a GitHub account: select **Continue**, enter
+   the code it shows on GitHub, and approve.
+3. Select Peak Basket in the list, install it and restart Home Assistant.
+
+Release candidates are pre-releases, which the Marketplace does not offer by default. To
+get them: **Settings → Devices & services → Marketplace**, open Peak Basket's device page,
+enable the **Pre-release** entity (it is disabled by default) and turn it on.
+
+A HACS install moves to the Marketplace by itself on the first start of 2026.11.
+
+### HACS (Home Assistant 2026.10)
 
 1. In HACS, open the menu (⋮) → **Custom repositories**.
 2. Add `https://github.com/klconsultancy/ha-peak-basket` with the type **Integration**.
@@ -63,6 +81,9 @@ Peak Basket installs through [HACS](https://hacs.xyz/) as a custom repository:
    reaction time and its minimum run time. **Wants power** only matters with more than one
    load: see [Several loads](#several-loads).
 4. **More loads:** **Add load** on the Peak Basket page. **Reconfigure** on a load changes it.
+   **Reconfigure** on the Peak Basket entry changes the grid connection's sensors, such as
+   adding a PV source or an export counter later: the loads, the entity IDs and the history
+   stay, and the sensors of a source you remove go with it. The region cannot change.
 5. **Configure** on the grid connection sets:
 
 | Option | Default | Meaning |

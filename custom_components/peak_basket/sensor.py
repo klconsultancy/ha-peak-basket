@@ -14,6 +14,7 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.const import EntityCategory, UnitOfEnergy, UnitOfPower, UnitOfTime
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -216,6 +217,17 @@ async def async_setup_entry(
         load_sensors.append(LOAD_SOLAR)
     if solar or register:
         connection_sensors.append(_export(from_register=register))
+    # A source removed through Reconfigure takes its sensors with it, rather than leaving
+    # them behind as unavailable.
+    expected = {f"{entry.entry_id}_{d.key}" for d in connection_sensors} | {
+        f"{entry.entry_id}_{load.subentry_id}_{d.key}"
+        for load in coordinator.loads
+        for d in load_sensors
+    }
+    registry = er.async_get(hass)
+    for registered in er.async_entries_for_config_entry(registry, entry.entry_id):
+        if registered.domain == "sensor" and registered.unique_id not in expected:
+            registry.async_remove(registered.entity_id)
     async_add_entities(ConnectionSensor(coordinator, d) for d in connection_sensors)
     for load in coordinator.loads:
         async_add_entities(
