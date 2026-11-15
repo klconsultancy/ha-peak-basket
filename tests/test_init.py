@@ -1,0 +1,237 @@
+"""The entry's setup, the coordinator and the sensors, end to end."""
+
+from __future__ import annotations
+
+from datetime import timedelta
+from typing import TYPE_CHECKING, Any
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+from homeassistant.config_entries import ConfigEntryState
+from homeassistant.core import State
+
+from .conftest import (
+    AVERAGE,
+    EV,
+    GRID,
+    IMPORT,
+    SOURCES,
+    START,
+    set_sources,
+    setup_entry,
+    tick,
+    value,
+)
+
+if TYPE_CHECKING:
+    from freezegun.api import FrozenDateTimeFactory
+    from homeassistant.core import HomeAssistant
+
+
+async def test_mid_window_start_without_history_falls_back(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    freezer.move_to(START)
+    set_sources(hass, 1650, 12345.0, 0)
+    await setup_entry(hass)
+    assert value(hass, "mode") == "fallback"
+    assert float(value(hass, "grid_limit")) == 5400
+    assert float(value(hass, "basket")) == 1375
+    assert float(value(hass, "margin")) == 25
+    assert value(hass, "used") == "unknown"
+
+
+async def test_next_window_starts_from_the_last_reading_before_it(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    freezer.move_to(START)
+    set_sources(hass, 1650, 12345.0, 0)
+    await setup_entry(hass)
+
+    # The meter reports every few seconds, also just before the boundary.
+    freezer.move_to("2026-11-15T03:14:58+00:00")
+    set_sources(hass, 1650, 12345.5, 0)
+    freezer.move_to("2026-11-15T03:15:02+00:00")
+    # The grid power arrives first and rolls the window over, before the counter is fresh.
+    hass.states.async_set(GRID, "1.65", {"unit_of_measurement": "kW"})
+    await hass.async_block_till_done()
+    assert value(hass, "mode") == "pulse_on"
+    assert float(value(hass, "house_power")) == 1650
+    assert float(value(hass, "allowed_load_power")) == pytest.approx(4340)
+    assert float(value(hass, "used")) == 0
+
+    # 1.2 kWh imported 10 min in: the house reserve takes the rest, so the load stops.
+    freezer.move_to("2026-11-15T03:25:02+00:00")
+    set_sources(hass, 5790, 12346.7, 4140)
+    await tick(hass)
+    assert float(value(hass, "used")) == pytest.approx(1200)
+    assert value(hass, "mode") == "pulse_off"
+    assert float(value(hass, "allowed_load_power")) == 0
+    assert float(value(hass, "charge_minutes")) == 0
+
+
+async def test_without_a_recent_reading_the_first_one_after_the_boundary_counts(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    freezer.move_to(START)
+    set_sources(hass, 1000, 100.0, 0)
+    await setup_entry(hass)
+    freezer.move_to("2026-11-15T03:15:01+00:00")
+    set_sources(hass, 1000, 100.2, 0)
+    await tick(hass)
+    assert float(value(hass, "used")) == 0
+    assert value(hass, "mode") == "continuous"
+
+
+async def test_stale_sources_fall_back(hass: HomeAssistant, freezer: FrozenDateTimeFactory) -> None:
+    freezer.move_to(START)
+    set_sources(hass, 1000, 100.0, 0)
+    await setup_entry(hass)
+    freezer.move_to(START + timedelta(minutes=10, seconds=5))
+    await tick(hass)
+    assert value(hass, "mode") == "fallback"
+    assert float(value(hass, "allowed_load_power")) == 0
+    assert value(hass, "house_power") == "unknown"
+
+
+async def test_missing_unavailable_and_non_numeric_sources_fall_back(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    freezer.move_to("2026-11-15T03:14:59+00:00")
+    set_sources(hass, 1000, 100.0, 0)
+    await setup_entry(hass)
+    freezer.move_to("2026-11-15T03:15:01+00:00")
+    set_sources(hass, 1000, 100.0, 0)
+    await tick(hass)
+    assert value(hass, "mode") == "continuous"
+
+    hass.states.async_set(EV, "unavailable")
+    await tick(hass)
+    assert value(hass, "mode") == "fallback"
+    hass.states.async_set(EV, "n/a", {"unit_of_measurement": "W"})
+    await tick(hass)
+    assert value(hass, "mode") == "fallback"
+    hass.states.async_remove(EV)
+    await tick(hass)
+    assert value(hass, "mode") == "fallback"
+
+
+async def test_unsupported_units_fall_back(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory, caplog: pytest.LogCaptureFixture
+) -> None:
+    freezer.move_to("2026-11-15T03:14:59+00:00")
+    set_sources(hass, 1000, 100.0, 0)
+    await setup_entry(hass)
+    freezer.move_to("2026-11-15T03:15:01+00:00")
+    hass.states.async_set(EV, "0", {"unit_of_measurement": "A"})
+    hass.states.async_set(IMPORT, "100", {"unit_of_measurement": "m³"})
+    await tick(hass)
+    assert value(hass, "mode") == "fallback"
+    assert "Unsupported power unit A on sensor.ev_power" in caplog.text
+    assert "Unsupported energy unit m³ on sensor.p1_import" in caplog.text
+
+
+async def test_counter_going_backwards_falls_back_for_the_window(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory, caplog: pytest.LogCaptureFixture
+) -> None:
+    freezer.move_to("2026-11-15T03:14:59+00:00")
+    set_sources(hass, 1000, 100.0, 0)
+    await setup_entry(hass)
+    freezer.move_to("2026-11-15T03:15:01+00:00")
+    set_sources(hass, 1000, 0.5, 0)  # a meter swap
+    await tick(hass)
+    assert value(hass, "mode") == "fallback"
+    assert "went backwards" in caplog.text
+    freezer.move_to("2026-11-15T03:15:06+00:00")
+    set_sources(hass, 1000, 0.6, 0)
+    await tick(hass)
+    assert value(hass, "mode") == "fallback"
+
+
+async def test_window_average_source_and_voltage_chain(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    """The meter's running average needs no history, so a mid-window start is exact."""
+    freezer.move_to(START)
+    hass.states.async_set(GRID, "1000", {"unit_of_measurement": "W"})
+    hass.states.async_set(EV, "0", {"unit_of_measurement": "W"})
+    hass.states.async_set(AVERAGE, "333.33", {"unit_of_measurement": "W"})  # 83.3 Wh so far
+    # L1 from the charger, L2 from the meter, L3 from neither: 235 + 231 + 230 V.
+    for phase, voltage in enumerate(["235", "unavailable", "0"], 1):
+        hass.states.async_set(f"sensor.charger_l{phase}", voltage, {"unit_of_measurement": "V"})
+    hass.states.async_set("sensor.meter_l2", "231", {"unit_of_measurement": "V"})
+    sources: dict[str, Any] = {
+        "name": "Peak Basket",
+        "profile": "be_flanders",
+        "grid_power": GRID,
+        "window_average": AVERAGE,
+        "load_power": EV,
+        "voltages": [f"sensor.charger_l{phase}" for phase in (1, 2, 3)],
+        "voltages_fallback": ["sensor.meter_l1", "sensor.meter_l2"],
+    }
+    entry = await setup_entry(hass, sources)
+
+    assert value(hass, "mode") == "continuous"
+    assert float(value(hass, "used")) == pytest.approx(83.3, abs=0.1)
+    # (5400 W x 900 s - 300000 J) over the 600 s left.
+    assert float(value(hass, "grid_limit")) == pytest.approx(7600, abs=1)
+    assert entry.runtime_data.data.p_load_min_w == pytest.approx(6 * 696)
+
+    hass.states.async_set(AVERAGE, "unavailable")
+    await tick(hass)
+    assert value(hass, "mode") == "fallback"
+
+
+async def test_month_peak_raises_the_target(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    freezer.move_to(START)
+    set_sources(hass, 1000, 100.0, 0)
+    # The monthly peak changes rarely: its age does not matter.
+    hass.states.async_set("sensor.month_peak", "6.1", {"unit_of_measurement": "kW"})
+    freezer.move_to(START + timedelta(minutes=5))
+    set_sources(hass, 1000, 100.0, 0)
+    await setup_entry(hass, {**SOURCES, "month_peak": "sensor.month_peak"})
+    assert float(value(hass, "target")) == 6100
+    assert float(value(hass, "basket")) == 1525
+
+
+async def test_restart_mid_window_restores_the_counter_from_history(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    freezer.move_to(START)
+    set_sources(hass, 1000, 100.1, 0)
+    history = [
+        {"state": "ignored, a compressed row"},
+        State(IMPORT, "unknown"),
+        State(IMPORT, "100.0"),
+    ]
+    with patch("custom_components.peak_basket.coordinator.get_instance") as get_instance:
+        get_instance.return_value.async_add_executor_job = AsyncMock(return_value={IMPORT: history})
+        await setup_entry(hass)
+    assert value(hass, "mode") == "continuous"
+    assert float(value(hass, "used")) == pytest.approx(100)
+
+
+async def test_restart_without_a_row_at_the_window_start_falls_back(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    freezer.move_to(START)
+    set_sources(hass, 1000, 100.1, 0)
+    recorder = MagicMock()
+    recorder.async_add_executor_job = AsyncMock(return_value={})
+    with patch("custom_components.peak_basket.coordinator.get_instance", return_value=recorder):
+        await setup_entry(hass)
+    assert value(hass, "mode") == "fallback"
+
+
+async def test_unload_stops_the_coordinator(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    freezer.move_to(START)
+    set_sources(hass, 1000, 100.0, 0)
+    entry = await setup_entry(hass)
+    coordinator = entry.runtime_data
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    assert entry.state is ConfigEntryState.NOT_LOADED
+    assert not coordinator._unsubs  # noqa: SLF001

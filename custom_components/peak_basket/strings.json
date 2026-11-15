@@ -1,0 +1,111 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Peak Basket",
+        "description": "Pick the existing sensors Peak Basket calculates from. It does not talk to any device itself.",
+        "data": {
+          "name": "Name",
+          "profile": "Tariff region",
+          "grid_power": "Grid power",
+          "window_average": "Window average power (recommended)",
+          "grid_import_energy": "Grid import energy",
+          "load_power": "Load power",
+          "month_peak": "Monthly peak (optional)",
+          "voltages": "Load phase voltages (optional)",
+          "voltages_fallback": "Meter phase voltages (optional)"
+        },
+        "data_description": {
+          "grid_power": "Instantaneous grid power, import positive (e.g. P1 meter). Export may be negative.",
+          "window_average": "The meter's running average for the current window (e.g. HomeWizard “average demand”, DSMR 1.4.0). Preferred over the import counter: exact and survives restarts.",
+          "grid_import_energy": "Import register (1.8.x) as a total-increasing energy counter. Used when no window average is set.",
+          "load_power": "Measured power of the controllable load (e.g. EV charger).",
+          "month_peak": "Highest window average this month; the target never goes below it.",
+          "voltages": "Measured voltage per phase at the load, in order L1, L2, L3. Used for the load's minimum and maximum power.",
+          "voltages_fallback": "Used per phase when the load voltage is missing or ≤ 180 V. Otherwise 230 V is assumed."
+        }
+      }
+    },
+    "error": {
+      "same_as_grid": "The load sensor must differ from the grid sensor.",
+      "no_energy_source": "Choose a window average or a grid import energy sensor."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Model parameters",
+        "data": {
+          "peak_goal_w": "Peak goal",
+          "margin_w": "Safety margin",
+          "reaction_s": "Reaction time",
+          "min_charge_s": "Minimum run time",
+          "extra_a": "Extra current in the last 5 minutes",
+          "min_a": "Minimum current",
+          "max_a": "Maximum current",
+          "max_age_s": "Maximum source age"
+        },
+        "data_description": {
+          "peak_goal_w": "Average power per window you allow. The target is the highest of this goal, the monthly peak and the region minimum.",
+          "margin_w": "Kept free in every window to absorb measurement and timing errors.",
+          "reaction_s": "Time between a lower limit and the load actually dropping (e.g. EVCC ≈ 20 s + 30 s cache).",
+          "min_charge_s": "In pulse mode, only start when budget for at least this long is left.",
+          "max_age_s": "Older source values count as unavailable and trigger the safe fallback."
+        }
+      }
+    }
+  },
+  "selector": {
+    "profile": {
+      "options": {
+        "be_flanders": "Belgium – Flanders (15 min, monthly peak)"
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "allowed_load_power": {
+        "name": "Allowed load power"
+      },
+      "grid_limit": {
+        "name": "Grid limit"
+      },
+      "mode": {
+        "name": "Mode",
+        "state": {
+          "continuous": "Continuous",
+          "pulse_on": "Pulse – on",
+          "pulse_off": "Pulse – off",
+          "fallback": "Fallback"
+        }
+      },
+      "charge_minutes": {
+        "name": "Run minutes left"
+      },
+      "target": {
+        "name": "Target"
+      },
+      "house_power": {
+        "name": "House power"
+      },
+      "basket": {
+        "name": "Basket"
+      },
+      "used": {
+        "name": "Used"
+      },
+      "house_reserve": {
+        "name": "House reserve"
+      },
+      "load_room": {
+        "name": "Load headroom"
+      },
+      "margin": {
+        "name": "Margin"
+      },
+      "remaining": {
+        "name": "Remaining"
+      }
+    }
+  }
+}

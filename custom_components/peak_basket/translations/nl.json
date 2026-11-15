@@ -1,0 +1,111 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Peak Basket",
+        "description": "Kies de bestaande sensoren waaruit Peak Basket rekent. Ze praat zelf met geen enkel toestel.",
+        "data": {
+          "name": "Naam",
+          "profile": "Tariefregio",
+          "grid_power": "Netvermogen",
+          "window_average": "Venstergemiddelde vermogen (aanbevolen)",
+          "grid_import_energy": "Energie afname net",
+          "load_power": "Vermogen afnemer",
+          "month_peak": "Maandpiek (optioneel)",
+          "voltages": "Spanning per fase afnemer (optioneel)",
+          "voltages_fallback": "Spanning per fase meter (optioneel)"
+        },
+        "data_description": {
+          "grid_power": "Ogenblikkelijk netvermogen, afname positief (bv. P1-meter). Injectie mag negatief zijn.",
+          "window_average": "Lopend gemiddelde van de meter voor het huidige venster (bv. HomeWizard “gemiddeld verbruik”, DSMR 1.4.0). Te verkiezen boven de afnameteller: exact en herstartbestendig.",
+          "grid_import_energy": "Afnameregister (1.8.x) als oplopende energieteller. Gebruikt als er geen venstergemiddelde gekozen is.",
+          "load_power": "Gemeten vermogen van de stuurbare afnemer (bv. laadpaal).",
+          "month_peak": "Hoogste venstergemiddelde deze maand; de target zakt nooit daaronder.",
+          "voltages": "Gemeten spanning per fase aan de afnemer, in volgorde L1, L2, L3. Voor het min- en max-vermogen van de afnemer.",
+          "voltages_fallback": "Per fase gebruikt als de spanning van de afnemer ontbreekt of ≤ 180 V is. Anders wordt 230 V aangenomen."
+        }
+      }
+    },
+    "error": {
+      "same_as_grid": "De sensor van de afnemer moet verschillen van de netsensor.",
+      "no_energy_source": "Kies een venstergemiddelde of een sensor voor energie afname net."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Modelparameters",
+        "data": {
+          "peak_goal_w": "Piekdoel",
+          "margin_w": "Veiligheidsmarge",
+          "reaction_s": "Reactietijd",
+          "min_charge_s": "Minimale looptijd",
+          "extra_a": "Extra stroom laatste 5 minuten",
+          "min_a": "Minimale stroom",
+          "max_a": "Maximale stroom",
+          "max_age_s": "Maximale leeftijd bron"
+        },
+        "data_description": {
+          "peak_goal_w": "Gemiddeld vermogen per venster dat je toelaat. De target is het hoogste van dit doel, de maandpiek en het regiominimum.",
+          "margin_w": "Blijft elk venster vrij om meet- en timingfouten op te vangen.",
+          "reaction_s": "Tijd tussen een lagere limiet en het effectief zakken van de afnemer (bv. EVCC ≈ 20 s + 30 s cache).",
+          "min_charge_s": "In pulsmodus pas starten als er nog minstens zo lang budget is.",
+          "max_age_s": "Oudere bronwaarden tellen als niet beschikbaar en geven de veilige fallback."
+        }
+      }
+    }
+  },
+  "selector": {
+    "profile": {
+      "options": {
+        "be_flanders": "België – Vlaanderen (15 min, maandpiek)"
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "allowed_load_power": {
+        "name": "Toegestaan vermogen afnemer"
+      },
+      "grid_limit": {
+        "name": "Netlimiet"
+      },
+      "mode": {
+        "name": "Modus",
+        "state": {
+          "continuous": "Continu",
+          "pulse_on": "Puls – aan",
+          "pulse_off": "Puls – uit",
+          "fallback": "Fallback"
+        }
+      },
+      "charge_minutes": {
+        "name": "Resterende laadminuten"
+      },
+      "target": {
+        "name": "Target"
+      },
+      "house_power": {
+        "name": "Vermogen huis"
+      },
+      "basket": {
+        "name": "Korf"
+      },
+      "used": {
+        "name": "Verbruikt"
+      },
+      "house_reserve": {
+        "name": "Reserve huis"
+      },
+      "load_room": {
+        "name": "Ruimte afnemer"
+      },
+      "margin": {
+        "name": "Marge"
+      },
+      "remaining": {
+        "name": "Nog beschikbaar"
+      }
+    }
+  }
+}

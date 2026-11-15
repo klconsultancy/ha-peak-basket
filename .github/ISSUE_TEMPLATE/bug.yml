@@ -1,0 +1,42 @@
+name: Bug report
+description: Something does not work as expected
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you expect, and what happened instead? Include the mode and the sensor values at that moment if you can.
+    validations:
+      required: true
+  - type: input
+    id: region
+    attributes:
+      label: Region profile
+      placeholder: Belgium – Flanders
+    validations:
+      required: true
+  - type: textarea
+    id: sources
+    attributes:
+      label: Source sensors
+      description: Which sensors you picked for the grid power, the used energy (window average or import counter) and the load, with their integration and unit.
+      placeholder: |
+        Grid power: HomeWizard P1, W
+        Window average: HomeWizard P1 "average demand", W
+        Load power: EVCC charge power, W
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Integration and Home Assistant version
+      placeholder: 0.1.0 on 2026.10.4
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Debug logs of `custom_components.peak_basket`, if relevant.
+      render: text

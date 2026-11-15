@@ -1,0 +1,17 @@
+{
+  "domain": "peak_basket",
+  "name": "Peak Basket",
+  "after_dependencies": [
+    "recorder"
+  ],
+  "codeowners": [
+    "@kristoflemmens"
+  ],
+  "config_flow": true,
+  "documentation": "https://github.com/klconsultancy/ha-peak-basket",
+  "integration_type": "helper",
+  "iot_class": "calculated",
+  "issue_tracker": "https://github.com/klconsultancy/ha-peak-basket/issues",
+  "requirements": [],
+  "version": "0.0.0"
+}
