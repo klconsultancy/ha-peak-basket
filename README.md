@@ -52,7 +52,10 @@ The integration installs through [HACS](https://hacs.xyz/) as a custom repositor
    phase voltages are optional.
 3. Describe the **first load**, such as the EV charger: its power sensor and, optionally,
    its phase voltages (per phase the load's voltage is used, else the meter's, else
-   230 V), its current range, reaction time and minimum run time.
+   230 V), a **demand** entity (on while it wants power, such as "car plugged in"), its
+   current range, reaction time and minimum run time. With more than one load, the
+   demand entity keeps an idle load that cannot start (a car not plugged in) from holding
+   on to room the others could use.
 4. Add more loads with **Add load** on the Peak Basket card. Each has a **priority**
    (lower goes first): a load gets what the loads before it leave unused, and the loads
    after it yield to it. **Reconfigure** on a load changes it.

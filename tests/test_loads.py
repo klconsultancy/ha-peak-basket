@@ -13,7 +13,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.peak_basket import async_migrate_entry
 from custom_components.peak_basket.const import DOMAIN
 
-from .conftest import EV, GRID, IMPORT, set_sources, setup_entry, tick, value
+from .conftest import EV, GRID, IMPORT, SOURCES, set_sources, setup_entry, tick, value
 
 if TYPE_CHECKING:
     from freezegun.api import FrozenDateTimeFactory
@@ -329,3 +329,87 @@ async def test_a_running_load_claims_only_what_it_draws(
     boiler_limit = float(_load_value(hass, entry, boiler, "grid_limit"))
     boiler_allowed = float(_load_value(hass, entry, boiler, "allowed_power"))
     assert boiler_limit - boiler_allowed == pytest.approx(1000 + 4140, abs=10)
+
+
+async def _idle_pair(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory, **ev: str
+) -> tuple[ConfigEntry, str, str]:
+    """House 1000 W, EV and boiler idle at 0 W, 1 s into the 03:15 window."""
+    freezer.move_to("2026-11-15T03:14:59+00:00")
+    set_sources(hass, 1000, 100.0, 0)
+    hass.states.async_set(BOILER, "0", {"unit_of_measurement": "W"})
+    entry = await setup_entry(hass, {**SOURCES, **ev})
+    boiler = await _add_boiler(hass, entry, 2)
+    (car,) = (s.subentry_id for s in entry.subentries.values() if s.title != "Boiler")
+    await _idle_at(hass, freezer, "2026-11-15T03:15:01+00:00")
+    return entry, car, boiler
+
+
+async def _idle_at(hass: HomeAssistant, freezer: FrozenDateTimeFactory, at: str) -> None:
+    freezer.move_to(at)
+    set_sources(hass, 1000, 100.0, 0)
+    hass.states.async_set(BOILER, "0", {"unit_of_measurement": "W"})
+    await tick(hass)
+
+
+def _boiler_sees(hass: HomeAssistant, entry: ConfigEntry, boiler: str) -> float:
+    """The house as the boiler counts it: its grid limit minus its allowed power."""
+    limit = float(_load_value(hass, entry, boiler, "grid_limit"))
+    return limit - float(_load_value(hass, entry, boiler, "allowed_power"))
+
+
+async def test_an_idle_load_claims_only_for_its_reaction_time(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    """A car that is not plugged in must not keep the boiler out all day."""
+    entry, car, boiler = await _idle_pair(hass, freezer)
+    car_allowed = float(_load_value(hass, entry, car, "allowed_power"))
+    assert _boiler_sees(hass, entry, boiler) == pytest.approx(1000 + car_allowed, abs=20)
+
+    await _idle_at(hass, freezer, "2026-11-15T03:16:40+00:00")  # 99 s > 90 s reaction
+    assert _boiler_sees(hass, entry, boiler) == pytest.approx(1000, abs=10)
+    await _idle_at(hass, freezer, "2026-11-15T03:20:00+00:00")
+    assert _boiler_sees(hass, entry, boiler) == pytest.approx(1000, abs=10)
+
+
+async def test_a_lapsed_claim_comes_back_in_a_new_window_or_after_drawing(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    entry, car, boiler = await _idle_pair(hass, freezer)
+    await _idle_at(hass, freezer, "2026-11-15T03:16:40+00:00")
+    assert _boiler_sees(hass, entry, boiler) == pytest.approx(1000, abs=10)
+
+    await _idle_at(hass, freezer, "2026-11-15T03:30:01+00:00")
+    car_allowed = float(_load_value(hass, entry, car, "allowed_power"))
+    assert _boiler_sees(hass, entry, boiler) == pytest.approx(1000 + car_allowed, abs=20)
+
+    await _idle_at(hass, freezer, "2026-11-15T03:31:40+00:00")
+    assert _boiler_sees(hass, entry, boiler) == pytest.approx(1000, abs=10)
+    # The car draws for a moment, then stops: a fresh claim.
+    freezer.move_to("2026-11-15T03:31:45+00:00")
+    set_sources(hass, 5140, 100.1, 4140)
+    hass.states.async_set(BOILER, "0", {"unit_of_measurement": "W"})
+    await tick(hass)
+    await _idle_at(hass, freezer, "2026-11-15T03:31:50+00:00")
+    car_allowed = float(_load_value(hass, entry, car, "allowed_power"))
+    assert _boiler_sees(hass, entry, boiler) == pytest.approx(1000 + car_allowed, abs=20)
+
+
+async def test_a_load_without_demand_claims_nothing(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    hass.states.async_set("binary_sensor.car_plugged_in", "off")
+    entry, car, boiler = await _idle_pair(hass, freezer, demand="binary_sensor.car_plugged_in")
+    # It may still start: it keeps its own allowed power.
+    assert float(_load_value(hass, entry, car, "allowed_power")) > 0
+    assert _boiler_sees(hass, entry, boiler) == pytest.approx(1000, abs=10)
+
+
+async def test_a_load_with_demand_claims_until_it_draws(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    hass.states.async_set("binary_sensor.car_plugged_in", "on")
+    entry, car, boiler = await _idle_pair(hass, freezer, demand="binary_sensor.car_plugged_in")
+    await _idle_at(hass, freezer, "2026-11-15T03:20:00+00:00")  # well past the reaction time
+    car_allowed = float(_load_value(hass, entry, car, "allowed_power"))
+    assert _boiler_sees(hass, entry, boiler) == pytest.approx(1000 + car_allowed, abs=20)

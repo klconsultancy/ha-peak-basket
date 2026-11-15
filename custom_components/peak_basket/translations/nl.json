@@ -32,6 +32,7 @@
           "name": "Naam",
           "load_power": "Vermogen afnemer",
           "voltages": "Spanning per fase afnemer (optioneel)",
+          "demand": "Vraag (optioneel)",
           "priority": "Prioriteit",
           "min_a": "Minimale stroom",
           "max_a": "Maximale stroom",
@@ -42,6 +43,7 @@
         "data_description": {
           "load_power": "Gemeten vermogen van de afnemer.",
           "voltages": "Gemeten spanning per fase aan de afnemer, in volgorde L1, L2, L3. Bepaalt zijn minimale en maximale vermogen.",
+          "demand": "Aan zolang de afnemer vermogen wil: een ingeplugde auto, een thermostaat die warmte vraagt. Enkel dan houdt een stilstaande afnemer zijn ruimte vrij voor zichzelf. Zonder duurt die claim de reactietijd.",
           "priority": "Lager gaat voor. Een afnemer krijgt wat de afnemers vóór hem onbenut laten; de afnemers na hem wijken voor hem.",
           "reaction_s": "Tijd tussen een lagere limiet en het effectief zakken van de afnemer (bv. EVCC ≈ 20 s + 30 s cache).",
           "min_charge_s": "In pulsmodus pas starten als er nog minstens zo lang budget is.",
@@ -85,6 +87,7 @@
             "name": "Naam",
             "load_power": "Vermogen afnemer",
             "voltages": "Spanning per fase afnemer (optioneel)",
+            "demand": "Vraag (optioneel)",
             "priority": "Prioriteit",
             "min_a": "Minimale stroom",
             "max_a": "Maximale stroom",
@@ -95,6 +98,7 @@
           "data_description": {
             "load_power": "Gemeten vermogen van de afnemer.",
             "voltages": "Gemeten spanning per fase aan de afnemer, in volgorde L1, L2, L3. Bepaalt zijn minimale en maximale vermogen.",
+            "demand": "Aan zolang de afnemer vermogen wil: een ingeplugde auto, een thermostaat die warmte vraagt. Enkel dan houdt een stilstaande afnemer zijn ruimte vrij voor zichzelf. Zonder duurt die claim de reactietijd.",
             "priority": "Lager gaat voor. Een afnemer krijgt wat de afnemers vóór hem onbenut laten; de afnemers na hem wijken voor hem.",
             "reaction_s": "Tijd tussen een lagere limiet en het effectief zakken van de afnemer (bv. EVCC ≈ 20 s + 30 s cache).",
             "min_charge_s": "In pulsmodus pas starten als er nog minstens zo lang budget is.",
@@ -108,6 +112,7 @@
             "name": "Naam",
             "load_power": "Vermogen afnemer",
             "voltages": "Spanning per fase afnemer (optioneel)",
+            "demand": "Vraag (optioneel)",
             "priority": "Prioriteit",
             "min_a": "Minimale stroom",
             "max_a": "Maximale stroom",
@@ -118,6 +123,7 @@
           "data_description": {
             "load_power": "Gemeten vermogen van de afnemer.",
             "voltages": "Gemeten spanning per fase aan de afnemer, in volgorde L1, L2, L3. Bepaalt zijn minimale en maximale vermogen.",
+            "demand": "Aan zolang de afnemer vermogen wil: een ingeplugde auto, een thermostaat die warmte vraagt. Enkel dan houdt een stilstaande afnemer zijn ruimte vrij voor zichzelf. Zonder duurt die claim de reactietijd.",
             "priority": "Lager gaat voor. Een afnemer krijgt wat de afnemers vóór hem onbenut laten; de afnemers na hem wijken voor hem.",
             "reaction_s": "Tijd tussen een lagere limiet en het effectief zakken van de afnemer (bv. EVCC ≈ 20 s + 30 s cache).",
             "min_charge_s": "In pulsmodus pas starten als er nog minstens zo lang budget is.",
