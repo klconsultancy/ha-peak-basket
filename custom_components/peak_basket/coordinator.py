@@ -54,6 +54,7 @@ from .const import (
 )
 from .model import (
     PROFILES,
+    Mode,
     ModelInput,
     ModelParams,
     ModelResult,
@@ -279,6 +280,7 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
             self.params,
         )
         results: dict[str, ModelResult] = {}
+        claimed = 0.0
         for k, load in enumerate(self.loads):
             # Per phase: the load's voltage, then the meter's, then nominal (in the model).
             own = [self._number(e, now) for e in load.voltage_entities]
@@ -295,10 +297,19 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
                     window_import_wh=used_wh,
                     voltages=voltages or None,
                     other_loads_w=sum(powers[k + 1 :]),
+                    reserved_w=claimed,
                 ),
                 self.profile,
                 load.params,
             )
+            result = results[load.subentry_id]
+            if (
+                result.mode in {Mode.CONTINUOUS, Mode.PULSE_ON}
+                and powers[k] <= load.params.charging_threshold_w
+            ):
+                # It may start but does not draw yet, so the grid does not show it: the
+                # loads after it must not count on the same room.
+                claimed += result.allowed_load_w
 
         pv: float | None = 0.0
         if pv_entity := self._src.get(CONF_PV_POWER):

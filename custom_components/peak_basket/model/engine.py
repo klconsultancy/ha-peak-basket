@@ -80,6 +80,9 @@ class ModelInput:
     other_loads_w: float | None = 0.0
     """Measured power of the loads with a lower priority: they yield to this load, so they
     do not count as house. ``None`` when one of them is unknown."""
+    reserved_w: float = 0.0
+    """Power claimed by loads with a higher priority that may start but do not draw yet.
+    It counts as house, so two loads cannot count on the same room."""
 
 
 @dataclass(frozen=True)
@@ -151,10 +154,10 @@ def evaluate(
     margin_wh = params.margin_w * window / SECONDS_PER_HOUR
 
     house: float | None = None
+    other = max(inp.other_loads_w or 0.0, 0.0)
     if inp.grid_import_w is not None and inp.load_w is not None and inp.other_loads_w is not None:
-        house = max(
-            max(inp.grid_import_w, 0.0) - max(inp.load_w, 0.0) - max(inp.other_loads_w, 0.0),
-            0.0,
+        house = max(max(inp.grid_import_w, 0.0) - max(inp.load_w, 0.0) - other, 0.0) + max(
+            inp.reserved_w, 0.0
         )
 
     if house is None or inp.window_import_wh is None:
@@ -162,7 +165,8 @@ def evaluate(
         return ModelResult(
             mode=Mode.FALLBACK,
             limit_w=goal,
-            allowed_load_w=max(goal - house, 0.0) if house is not None else 0.0,
+            # The loads that yield count as house here: the static limit is for them all.
+            allowed_load_w=max(goal - house - other, 0.0) if house is not None else 0.0,
             house_w=house,
             charge_minutes=0.0,
             basket_wh=basket_wh,
@@ -206,7 +210,8 @@ def evaluate(
     remaining_wh = e_rest / SECONDS_PER_HOUR
     return ModelResult(
         mode=mode,
-        limit_w=limit,
+        # The grid's limit: the loads that yield draw on top of this load's room.
+        limit_w=limit + other,
         allowed_load_w=max(limit - house, 0.0),
         house_w=house,
         charge_minutes=charge_s / 60,

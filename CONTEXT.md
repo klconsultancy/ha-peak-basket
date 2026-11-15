@@ -45,8 +45,12 @@ loads after it yield to it: they get what it leaves unused right now.
 : What the load may draw now: the pull output that EVCC, Node-RED or an automation reads.
 
 **Grid limit**
-: Per load, the total grid import allowed now with that load included: for a circuit limit
-of the system that drives it.
+: Per load, the total grid import allowed now: the house, the load's allowed power and the
+loads after it, which yield. For a circuit limit of the system that drives the load.
+
+**Claim**
+: The allowed power of a load that may start but does not draw yet. The loads after it
+count it as house.
 
 **Mode**
 : Continuous (budget for the load's minimum power until the window ends), pulse on (a burst

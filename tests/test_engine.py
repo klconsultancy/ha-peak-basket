@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
@@ -325,3 +325,37 @@ class TestOtherLoads:
         )
         assert res.mode is Mode.FALLBACK
         assert res.allowed_load_w == 0
+
+
+class TestSeveralLoads:
+    def _inp(self, **kwargs: float | None) -> ModelInput:
+        base: dict[str, Any] = {
+            "target_w": TARGET,
+            "seconds_in_window": 0,
+            "grid_import_w": 7140,
+            "load_w": 4140,
+            "window_import_wh": 0,
+            "other_loads_w": 2000,
+        }
+        return ModelInput(**(base | kwargs))
+
+    def test_grid_limit_includes_the_loads_that_yield(self) -> None:
+        alone = evaluate(self._inp(grid_import_w=5140, other_loads_w=0), BE_FLANDERS)
+        res = evaluate(self._inp(), BE_FLANDERS)
+        assert res.allowed_load_w == pytest.approx(alone.allowed_load_w)
+        assert res.limit_w == pytest.approx(alone.limit_w + 2000)
+
+    def test_fallback_counts_the_loads_that_yield_as_house(self) -> None:
+        res = evaluate(self._inp(window_import_wh=None), BE_FLANDERS)
+        assert res.mode is Mode.FALLBACK
+        assert res.limit_w == pytest.approx(GOAL)
+        assert res.allowed_load_w == pytest.approx(GOAL - 1000 - 2000)
+
+    def test_a_claim_of_a_starting_load_counts_as_house(self) -> None:
+        free = evaluate(self._inp(grid_import_w=1000, load_w=0, other_loads_w=0), BE_FLANDERS)
+        claimed = evaluate(
+            self._inp(grid_import_w=1000, load_w=0, other_loads_w=0, reserved_w=3000),
+            BE_FLANDERS,
+        )
+        assert claimed.house_w == pytest.approx(4000)
+        assert claimed.allowed_load_w < free.allowed_load_w

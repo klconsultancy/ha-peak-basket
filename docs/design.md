@@ -143,7 +143,17 @@ Loads go in priority order, lower first. For a load, the house is the grid impor
 its own power and the power of the loads after it: the loads before it count as house,
 the loads after it yield. So the first load gets the whole basket after the house, and a
 later load gets what the earlier ones leave unused right now. When an earlier load starts
-drawing more, a later one's allowed power drops on the next evaluation. A load whose power
+drawing more, a later one's allowed power drops on the next evaluation.
+
+An earlier load that may start (continuous or pulse on) but does not draw yet (100 W or
+less) is invisible to the grid. Its allowed power then counts as house for the loads
+after it: otherwise both would count on the same room for up to the reaction time.
+
+Each load's **grid limit** is the whole grid's: the house (with those claims), the load's
+allowed power, and the measured power of the loads after it, which yield. A circuit limit
+that compares it with the grid's import then throttles the loads that yield first, not
+this one. In fallback the loads that yield count as house, so that all of them stay
+within the goal. A load whose power
 is unknown counts as 0 W, see below.
 
 The connection's own figures (house power, used, remaining, house reserve) take every
