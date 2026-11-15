@@ -56,9 +56,11 @@ The integration installs through [HACS](https://hacs.xyz/) as a custom repositor
    current range, reaction time and minimum run time. With more than one load, the
    demand entity keeps an idle load that cannot start (a car not plugged in) from holding
    on to room the others could use.
-4. Add more loads with **Add load** on the Peak Basket card. Each has a **priority**
-   (lower goes first): a load gets what the loads before it leave unused, and the loads
-   after it yield to it. **Reconfigure** on a load changes it.
+4. Add more loads with **Add load** on the Peak Basket card. Add only loads that follow
+   their allowed power: something (EVCC, an automation) must drive them from it. A
+   consumer you only want to watch, such as a heat pump, belongs in the house.
+   Each load has a **priority** (lower goes first): a load gets what the loads before it
+   leave unused, and the loads after it yield to it. **Reconfigure** on a load changes it.
 5. Under **Configure**, set the peak goal (the window average you allow, 5500 W by
    default) and, if needed, the margin.
 

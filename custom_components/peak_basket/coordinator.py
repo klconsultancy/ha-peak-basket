@@ -377,16 +377,17 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
         ``powers`` is grid, PV (0 without a PV source), then each load in priority order.
         The interval counts at the powers reported at its start, and only when they were
         all known and the interval is no longer than the maximum source age: a gap is not
-        filled in.
+        filled in. An interval across the boundary counts its part after the boundary in
+        the new window; the part before is lost with the old window's last published sums.
         """
         if start != self._sums_window:
             self._sums_window = start
             self._sums = {}
-        elif self._last_powers is not None:
+        if self._last_powers is not None:
             since, (grid, pv, *loads) = self._last_powers
             known = grid is not None and pv is not None and None not in loads
             if known and now - since <= self._max_age:
-                hours = (now - since).total_seconds() / SECONDS_PER_HOUR
+                hours = (now - max(since, start)).total_seconds() / SECONDS_PER_HOUR
                 split = allocate_solar(
                     solar=cast("float", pv),
                     export=max(-cast("float", grid), 0.0),

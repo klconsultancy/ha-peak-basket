@@ -47,7 +47,15 @@ jobs:
           TAG: ${{ steps.release.outputs.tag_name }}
         run: |
           python3 -m script.release_zip "$TAG" peak_basket.zip
-          gh release upload "$TAG" peak_basket.zip --repo "$GITHUB_REPOSITORY" --clobber
+          # A release without its zip is one HACS cannot install: retry, then check.
+          for attempt in 1 2 3; do
+            gh release upload "$TAG" peak_basket.zip --repo "$GITHUB_REPOSITORY" --clobber && break
+            echo "Upload attempt $attempt failed."
+            sleep 10
+          done
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' \
+            | grep -qx peak_basket.zip \
+            || { echo "::error::$TAG has no peak_basket.zip: HACS cannot install it"; exit 1; }
 
   release-candidate:
     name: Release candidate
@@ -68,4 +76,12 @@ jobs:
           fi
           # HACS installs peak_basket.zip (hacs.json), with the version set to the tag's.
           python3 -m script.release_zip "$TAG" peak_basket.zip
-          gh release upload "$TAG" peak_basket.zip --repo "$GITHUB_REPOSITORY" --clobber
+          # A release without its zip is one HACS cannot install: retry, then check.
+          for attempt in 1 2 3; do
+            gh release upload "$TAG" peak_basket.zip --repo "$GITHUB_REPOSITORY" --clobber && break
+            echo "Upload attempt $attempt failed."
+            sleep 10
+          done
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' \
+            | grep -qx peak_basket.zip \
+            || { echo "::error::$TAG has no peak_basket.zip: HACS cannot install it"; exit 1; }
