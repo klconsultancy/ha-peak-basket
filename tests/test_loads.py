@@ -10,6 +10,7 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
+from custom_components.peak_basket import async_migrate_entry
 from custom_components.peak_basket.const import DOMAIN
 
 from .conftest import EV, GRID, IMPORT, set_sources, setup_entry, tick, value
@@ -255,3 +256,38 @@ async def test_a_newer_entry_version_is_refused(hass: HomeAssistant) -> None:
     entry = MockConfigEntry(domain=DOMAIN, version=3, data={})
     entry.add_to_hass(hass)
     assert not await hass.config_entries.async_setup(entry.entry_id)
+
+
+async def test_migration_leaves_a_version_2_entry_alone(hass: HomeAssistant) -> None:
+    """Home Assistant also migrates on a minor version bump: nothing to move then."""
+    entry = MockConfigEntry(domain=DOMAIN, version=2, data={"grid_power": GRID})
+    entry.add_to_hass(hass)
+    assert await async_migrate_entry(hass, entry)
+    assert dict(entry.data) == {"grid_power": GRID}
+    assert entry.subentries == {}
+
+
+async def test_migration_refuses_an_unknown_newer_version(hass: HomeAssistant) -> None:
+    entry = MockConfigEntry(domain=DOMAIN, version=3, data={})
+    entry.add_to_hass(hass)
+    assert not await async_migrate_entry(hass, entry)
+
+
+async def test_migrated_load_is_named_in_the_system_language(hass: HomeAssistant) -> None:
+    hass.config.language = "nl"
+    set_sources(hass, 1000, 100.0, 0)
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        version=1,
+        data={
+            "profile": "be_flanders",
+            "grid_power": GRID,
+            "grid_import_energy": IMPORT,
+            "load_power": EV,
+        },
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    (load,) = entry.subentries.values()
+    assert load.title == "Afnemer"
