@@ -108,11 +108,11 @@ LOAD_SCHEMA = probatio.Schema(
         probatio.Required(CONF_NAME): TextSelector(),
         probatio.Required(CONF_LOAD_POWER): _sensor("power"),
         probatio.Optional(CONF_LOAD_VOLTAGES): _sensor("voltage", multiple=True),
-        probatio.Optional(CONF_DEMAND): EntitySelector(
-            EntitySelectorConfig(domain=["binary_sensor", "switch", "input_boolean"])
-        ),
         probatio.Required(CONF_PRIORITY, default=DEFAULT_LOAD[CONF_PRIORITY]): probatio.All(
             _number(0, 99, 1), probatio.Coerce(int)
+        ),
+        probatio.Optional(CONF_DEMAND): EntitySelector(
+            EntitySelectorConfig(domain=["binary_sensor", "switch", "input_boolean"])
         ),
         probatio.Required(CONF_MIN_A, default=DEFAULT_LOAD[CONF_MIN_A]): _number(1, 32, 0.5, "A"),
         probatio.Required(CONF_MAX_A, default=DEFAULT_LOAD[CONF_MAX_A]): _number(1, 63, 0.5, "A"),

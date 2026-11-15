@@ -32,8 +32,8 @@
           "name": "Name",
           "load_power": "Load power",
           "voltages": "Load phase voltages (optional)",
-          "demand": "Demand (optional)",
           "priority": "Priority",
+          "demand": "Wants power (optional)",
           "min_a": "Minimum current",
           "max_a": "Maximum current",
           "reaction_s": "Reaction time",
@@ -43,8 +43,8 @@
         "data_description": {
           "load_power": "Measured power of the load.",
           "voltages": "Measured voltage per phase at the load, in order L1, L2, L3. They set its minimum and maximum power.",
-          "demand": "On while the load wants power: a car plugged in, a thermostat calling for heat. Only then does an idle load keep its room from the loads after it. Without it, that claim lasts the reaction time.",
           "priority": "Lower goes first. A load gets what the loads before it leave unused; the loads after it yield to it.",
+          "demand": "Only needed with more than one load. An entity that is on while this load wants power, such as the “vehicle connected” sensor of a charger or a thermostat calling for heat. While it is on, Peak Basket keeps room for this load even before it draws anything, so the loads after it cannot use that room. Without it, that reservation lasts the reaction time.",
           "reaction_s": "Time between a lower limit and the load actually dropping (e.g. EVCC ≈ 20 s + 30 s cache).",
           "min_charge_s": "In pulse mode, only start when budget for at least this long is left.",
           "extra_a": "Catching up allowed above the base in the last 5 minutes of a window."
@@ -113,8 +113,8 @@
             "name": "Name",
             "load_power": "Load power",
             "voltages": "Load phase voltages (optional)",
-            "demand": "Demand (optional)",
             "priority": "Priority",
+            "demand": "Wants power (optional)",
             "min_a": "Minimum current",
             "max_a": "Maximum current",
             "reaction_s": "Reaction time",
@@ -124,8 +124,8 @@
           "data_description": {
             "load_power": "Measured power of the load.",
             "voltages": "Measured voltage per phase at the load, in order L1, L2, L3. They set its minimum and maximum power.",
-            "demand": "On while the load wants power: a car plugged in, a thermostat calling for heat. Only then does an idle load keep its room from the loads after it. Without it, that claim lasts the reaction time.",
             "priority": "Lower goes first. A load gets what the loads before it leave unused; the loads after it yield to it.",
+            "demand": "Only needed with more than one load. An entity that is on while this load wants power, such as the “vehicle connected” sensor of a charger or a thermostat calling for heat. While it is on, Peak Basket keeps room for this load even before it draws anything, so the loads after it cannot use that room. Without it, that reservation lasts the reaction time.",
             "reaction_s": "Time between a lower limit and the load actually dropping (e.g. EVCC ≈ 20 s + 30 s cache).",
             "min_charge_s": "In pulse mode, only start when budget for at least this long is left.",
             "extra_a": "Catching up allowed above the base in the last 5 minutes of a window."
@@ -138,8 +138,8 @@
             "name": "Name",
             "load_power": "Load power",
             "voltages": "Load phase voltages (optional)",
-            "demand": "Demand (optional)",
             "priority": "Priority",
+            "demand": "Wants power (optional)",
             "min_a": "Minimum current",
             "max_a": "Maximum current",
             "reaction_s": "Reaction time",
@@ -149,8 +149,8 @@
           "data_description": {
             "load_power": "Measured power of the load.",
             "voltages": "Measured voltage per phase at the load, in order L1, L2, L3. They set its minimum and maximum power.",
-            "demand": "On while the load wants power: a car plugged in, a thermostat calling for heat. Only then does an idle load keep its room from the loads after it. Without it, that claim lasts the reaction time.",
             "priority": "Lower goes first. A load gets what the loads before it leave unused; the loads after it yield to it.",
+            "demand": "Only needed with more than one load. An entity that is on while this load wants power, such as the “vehicle connected” sensor of a charger or a thermostat calling for heat. While it is on, Peak Basket keeps room for this load even before it draws anything, so the loads after it cannot use that room. Without it, that reservation lasts the reaction time.",
             "reaction_s": "Time between a lower limit and the load actually dropping (e.g. EVCC ≈ 20 s + 30 s cache).",
             "min_charge_s": "In pulse mode, only start when budget for at least this long is left.",
             "extra_a": "Catching up allowed above the base in the last 5 minutes of a window."

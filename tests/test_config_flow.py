@@ -210,3 +210,11 @@ async def test_reconfigure_refuses_what_setup_refuses(hass: HomeAssistant) -> No
     assert result["errors"] == {"base": "no_energy_source"}
     result = await _reconfigure(hass, entry, {"grid_power": EV, "grid_import_energy": IMPORT})
     assert result["errors"] == {"grid_power": "grid_is_a_load"}
+
+
+def test_demand_comes_right_after_priority() -> None:
+    """It only means something together with the priority, so it sits next to it."""
+    from custom_components.peak_basket.config_flow import LOAD_SCHEMA  # noqa: PLC0415
+
+    keys = [str(key) for key in LOAD_SCHEMA.schema]
+    assert keys.index("demand") == keys.index("priority") + 1

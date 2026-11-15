@@ -77,11 +77,9 @@ A HACS install moves to the Marketplace by itself on the first start of 2026.11.
 2. **The grid connection:** the tariff region and the meter's sensors. Prefer the window
    average over the import counter: it is exact, also right after a restart.
 3. **The first load,** such as the EV charger: its power sensor, its phase voltages (per
-   phase the load's voltage is used, else the meter's, else 230 V), optionally a
-   **demand** entity (on while it wants power, such as "car plugged in"), its current
-   range, its reaction time and its minimum run time. With more than one load, the demand
-   entity keeps an idle load that cannot start, such as a car that is not plugged in, from
-   holding on to room the others could use.
+   phase the load's voltage is used, else the meter's, else 230 V), its current range, its
+   reaction time and its minimum run time. **Wants power** only matters with more than one
+   load: see [Several loads](#several-loads).
 4. **More loads:** **Add load** on the Peak Basket page. **Reconfigure** on a load changes it.
    **Reconfigure** on the Peak Basket entry changes the grid connection's sensors, such as
    adding a PV source or an export counter later: the loads, the entity IDs and the history
@@ -97,9 +95,22 @@ A HACS install moves to the Marketplace by itself on the first start of 2026.11.
 ### Several loads
 
 Each load has a **priority**, lower first. A load gets what the loads before it leave
-unused, and the loads after it yield to it. A load that may start but does not draw yet
-keeps its room from the loads after it while it has **demand**: while its demand entity is
-not off, or, without one, for its reaction time. Add only loads that follow their **Allowed
+unused, and the loads after it yield to it.
+
+A load that may start but does not draw anything yet is invisible on the meter, so Peak
+Basket keeps its room free for a while: the loads after it cannot take it. **Wants power**
+(optional, per load) says how long. It is an entity that is on while the load wants power:
+
+- a charger's "vehicle connected" or "plug" binary sensor, such as the one the Phoenix
+  Contact CHARX or EVCC integration has per connector or loadpoint;
+- a thermostat or heat pump that calls for heat.
+
+While it is on, the room stays reserved even if the load draws nothing yet; while it is
+off, the load can still start, but the loads after it may use its room. Without it, the
+reservation lasts the load's reaction time. So a car that is not plugged in does not keep
+a boiler after it out all day.
+
+Add only loads that follow their **Allowed
 power**: a load that keeps drawing on top of it takes budget the others were promised.
 Consumers you cannot steer are part of the house.
 
