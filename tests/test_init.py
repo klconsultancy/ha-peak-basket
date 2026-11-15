@@ -98,26 +98,41 @@ async def test_stale_sources_fall_back(hass: HomeAssistant, freezer: FrozenDateT
     assert value(hass, "house_power") == "unknown"
 
 
-async def test_missing_unavailable_and_non_numeric_sources_fall_back(
+async def test_an_unknown_load_power_counts_as_zero(
     hass: HomeAssistant, freezer: FrozenDateTimeFactory
 ) -> None:
+    """The house is then over-estimated: the load gets less room, never more."""
+    freezer.move_to("2026-11-15T03:14:59+00:00")
+    set_sources(hass, 5000, 100.0, 4000)
+    await setup_entry(hass)
+    freezer.move_to("2026-11-15T03:15:01+00:00")
+    set_sources(hass, 5000, 100.0, 4000)
+    await tick(hass)
+    assert float(value(hass, "house_power")) == 1000
+
+    for state, attributes in (("unavailable", {}), ("n/a", {"unit_of_measurement": "W"})):
+        hass.states.async_set(EV, state, attributes)
+        await tick(hass)
+        assert value(hass, "mode") != "fallback"
+        assert float(value(hass, "house_power")) == 5000
+    hass.states.async_remove(EV)
+    await tick(hass)
+    assert value(hass, "mode") != "fallback"
+
+
+async def test_a_load_that_only_reports_changes_can_start(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    """A plug at 0 W writes nothing new: its state ages, but the load must not lock out."""
     freezer.move_to("2026-11-15T03:14:59+00:00")
     set_sources(hass, 1000, 100.0, 0)
     await setup_entry(hass)
-    freezer.move_to("2026-11-15T03:15:01+00:00")
-    set_sources(hass, 1000, 100.0, 0)
-    await tick(hass)
-    assert value(hass, "mode") == "continuous"
-
-    hass.states.async_set(EV, "unavailable")
-    await tick(hass)
-    assert value(hass, "mode") == "fallback"
-    hass.states.async_set(EV, "n/a", {"unit_of_measurement": "W"})
-    await tick(hass)
-    assert value(hass, "mode") == "fallback"
-    hass.states.async_remove(EV)
-    await tick(hass)
-    assert value(hass, "mode") == "fallback"
+    freezer.move_to("2026-11-15T03:20:00+00:00")
+    hass.states.async_set(GRID, "1000", {"unit_of_measurement": "W"})
+    hass.states.async_set(IMPORT, "100.4", {"unit_of_measurement": "kWh"})
+    await tick(hass)  # the load's 0 W is five minutes old now
+    assert value(hass, "mode") != "fallback"
+    assert float(value(hass, "allowed_power")) > 0
 
 
 async def test_unsupported_units_fall_back(
