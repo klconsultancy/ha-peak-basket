@@ -1,0 +1,21 @@
+name: Claude review
+
+# Claude reviews every pull request against AGENTS.md (via CLAUDE.md), with the
+# organization's reusable workflow: inline comments, never an approval.
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review, reopened]
+
+permissions: {}
+
+jobs:
+  review:
+    name: Review
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+      id-token: write # the action authenticates as the Claude GitHub App
+    uses: klconsultancy/workflows/.github/workflows/claude-review.yml@952d3fc8ebebfb1e28dc67b84e64ffd4a54f585d # main
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}

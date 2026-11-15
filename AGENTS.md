@@ -12,6 +12,9 @@ for the design and [`CONTEXT.md`](CONTEXT.md) for terms before changing code.
 - Coverage must stay at 100% (line and branch); CI fails otherwise.
 - Work in a worktree on a branch and open a pull request. Never edit the main checkout and
   never push to `main` (see Commands).
+- Leave a pull request open for review: Claude reviews every one
+  (`.github/workflows/claude-review.yml`, from `klconsultancy/workflows`) and a person
+  merges it. Answer the review's comments before asking for the merge.
 - PR titles and squash commits follow Conventional Commits (`feat:`, `fix:`, `docs:`,
   `test:`, `refactor:`, `build:`, `ci:`, `chore:`). They drive release-please.
 - A release candidate is a tag `vX.Y.Z-rc.N` on `main`, pushed by an admin; the release
