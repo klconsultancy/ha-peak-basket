@@ -60,9 +60,9 @@ and it is no longer than the maximum source age, so a gap adds nothing. A PV pow
 missing or stale counts as 0 W, like a load's: an inverter that sleeps at night reports
 unavailable, and the loads' grid energy must still count.
 
-The house is the rest, not a sum of its own: **house from grid** is the import the meter
-counted (*Used*) minus what the loads drew from the grid, never below zero, so the two
-always add up to the import. **House from solar** is solar minus export minus what the
+The house is the rest, not a sum of its own: **house from grid** (*House – Grid import*) is
+the import the meter counted (the connection's *Grid import*) minus what the loads drew from the grid, never below zero, so the two
+always add up to the import. **House from solar** (*House – Solar import*) is solar minus export minus what the
 loads took from solar.
 
 Export comes from the export register (2.8.x) when one is configured, counted from the
@@ -95,7 +95,7 @@ from other integrations, and everything it decides is published as entities.
 |---|---|
 | Entry | One grid connection: grid power, the window average or the import register, optionally the monthly peak and the meter's phase voltages; the peak goal, margin and maximum source age |
 | Subentries | One per controllable load: its power sensor, optionally its phase voltages, its priority, current range, reaction time and minimum run time |
-| Output | The connection's device: target, house power and the basket fields. Each load's device: its allowed power, grid limit, mode, run minutes and headroom |
+| Output | The connection's device: target peak, the basket fields, solar and export. The house's device, under it: house power, house reserve and the house's grid and solar import. Each load's device: its allowed power, grid limit, mode, run minutes, budget left and its grid and solar import. The UI names are in [`CONTEXT.md`](../CONTEXT.md) |
 | Manifest | `iot_class: calculated`, `integration_type: service` (an integration card with its own device), no requirements, no credentials |
 
 The connection's device is named by translation ("Grid connection", "Aansluiting"), not

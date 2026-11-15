@@ -3,7 +3,7 @@
 Terms used in code, docs and issues. [`docs/design.md`](docs/design.md) explains how they fit
 together.
 
-**Window**
+**Window** (*Meetperiode* in Dutch; *kwartier* where the region is known)
 : The metering period the tariff averages over, in fixed clock blocks: 15 minutes in
 Flanders, 60 in Sweden and Norway. Never a sliding average.
 
@@ -11,7 +11,7 @@ Flanders, 60 in Sweden and Norway. Never a sliding average.
 : The energy one window may hold: the target times the window length. It starts full every
 window; what is left does not carry over.
 
-**Target**
+**Target** (*Target peak* in the UI, *Streefpiek* in Dutch)
 : The highest of the peak already reached this period, the peak goal and the region's
 billed minimum.
 
@@ -29,10 +29,12 @@ billed minimum.
 import counter, monthly peak, meter voltages) and its tunables (peak goal, margin, maximum
 source age) belong to it.
 
-**House**
-: Everything that is not controlled: the grid import minus the power of every load.
+**House** (*House*, *Huis*)
+: The default load: everything the connection uses that Peak Basket does not steer, the
+grid import minus the power of every load. It has its own device under the connection's,
+but no subentry: it cannot be removed and needs no configuration.
 
-**Load**
+**Load** (*Afnemer* in Dutch)
 : A controllable consumer, such as an EV charger, a boiler or a battery charging: a
 subentry of the grid connection, with its own device and sensors. Its power sensor,
 phase voltages, current range, reaction time and minimum run time belong to it.
@@ -52,17 +54,17 @@ loads after it, which yield. For a circuit limit of the system that drives the l
 : The allowed power of a load that may start but does not draw yet. The loads after it
 count it as house, while the load has demand.
 
-**Demand** (*Wants power* in the UI, *Vraag naar vermogen* in Dutch)
+**Demand** (*Wants power* in the UI, *Wil vermogen* in Dutch)
 : Whether a load wants power now, from an optional on/off entity per load (vehicle
 connected, thermostat calling for heat). Only matters with more than one load. Without one,
 an idle load's claim lasts its reaction time.
 
 **Mode**
 : Continuous (budget for the load's minimum power until the window ends), pulse on (a burst
-at minimum power fits), pulse off (only the house fits) or fallback (inputs missing or
-stale: a static limit at the goal).
+at minimum power fits), pulse off (only the house fits) or fallback (*Safe mode*, *Veilige stand*: inputs missing
+or stale, a static limit at the goal).
 
-**Remaining, house reserve, load room**
+**Remaining, house reserve, load room** (*Budget left*, *Reserve*, *Budget left*)
 : The basket fields: the goal budget left this window, the house's expected use until the
 window ends, and what is left for the load.
 
@@ -72,3 +74,29 @@ report: the energy so far divided by the window length.
 
 **Profile**
 : The tariff rules of one region, as data: window length and billed minimum.
+
+## Names in the UI
+
+The code keeps its own names (`house_*`, `used`, `load_room`); only what the user reads
+changes. Every part of the connection, the house included, names what it drew the same way.
+
+| Code | English | Dutch |
+|---|---|---|
+| load | Load | Afnemer (never *verbruiker*) |
+| house | House | Huis |
+| window | Window | Meetperiode, kwartier |
+| target | Target peak | Streefpiek |
+| fallback | Safe mode | Veilige stand |
+| grid connection | Grid connection | Aansluiting |
+| PV power | Solar power (inverter) | Vermogen zonnepanelen (omvormer) |
+| window average | Meter's window average | Kwartiergemiddelde van de meter |
+| import / export register | Import counter, Export counter | Afnameteller, Injectieteller |
+| `used`, `house_grid`, `load_grid` | Grid import | Afname net |
+| `house_solar`, `load_solar` | Solar import | Afname zon |
+| `solar` | Solar production | Zonneproductie |
+| `remaining`, `load_room` | Budget left | Resterend budget |
+| `charge_minutes` | Run minutes left | Resterende minuten |
+| `extra_a` | Catch-up current | Inhaalstroom |
+
+Per window: the connection's grid import is the house's plus every load's, and the solar
+production is the house's and every load's solar import plus the export.

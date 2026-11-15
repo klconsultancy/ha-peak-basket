@@ -22,7 +22,7 @@ your loads get the rest:
 | **Continuous** | The budget left covers at least the load's minimum power until the window ends | Up to what keeps the window's average at the goal |
 | **Pulse – on** | Not enough for that, but enough for a burst at minimum power | Its minimum power, for as long as the budget lasts |
 | **Pulse – off** | The budget for this window is used up | Nothing: only the house fits |
-| **Fallback** | A source is missing or too old | A static limit at your goal, never "unlimited" |
+| **Safe mode** | A source is missing or too old | A static limit at your goal, never "unlimited" |
 
 The next window starts with a full basket. The design, the model and the rules are in
 [docs/design.md](docs/design.md).
@@ -41,8 +41,8 @@ Node-RED, ESPHome or an automation reads them and drives the load, with its own 
 - For each load: its **power** sensor. The load must follow the **Allowed power** Peak
   Basket gives it (see [Several loads](#several-loads)).
 
-Optional: the monthly peak, the phase voltages of the meter and of each load, PV power, and
-the export counter.
+Optional: the monthly peak, the phase voltages of the meter and of each load, the solar
+power (your inverter), and the export counter.
 
 ## Installation
 
@@ -88,9 +88,9 @@ A HACS install moves to the Marketplace by itself on the first start of 2026.11.
 
 | Option | Default | Meaning |
 |---|---|---|
-| Peak goal | 5500 W | The window average you allow. The target is the highest of this goal, the monthly peak reached so far and the region's minimum: up to those, a window costs nothing extra. |
+| Peak goal | 5500 W | The window average you allow. The target peak is the highest of this goal, the monthly peak reached so far and the region's minimum: up to those, a window costs nothing extra. |
 | Safety margin | 100 W | Kept free in every window for measurement and timing errors. |
-| Maximum source age | 60 s | Older values count as missing and give the fallback. A load's power that is missing or too old counts as 0 W instead, so a load at rest can still start. |
+| Maximum age of a reading | 60 s | An older reading of the grid power, the window average or the import counter counts as missing and puts the loads in safe mode. A load's or the inverter's power that is missing or too old counts as 0 W instead, so a load at rest can still start. |
 
 ### Several loads
 
@@ -98,40 +98,53 @@ Each load has a **priority**, lower first. A load gets what the loads before it 
 unused, and the loads after it yield to it.
 
 A load that may start but does not draw anything yet is invisible on the meter, so Peak
-Basket keeps its room free for a while: the loads after it cannot take it. **Wants power**
+Basket keeps its budget free for a while: the loads after it cannot take it. **Wants power**
 (optional, per load) says how long. It is an entity that is on while the load wants power:
 
 - a charger's "vehicle connected" or "plug" binary sensor, such as the one the Phoenix
   Contact CHARX or EVCC integration has per connector or loadpoint;
 - a thermostat or heat pump that calls for heat.
 
-While it is on, the room stays reserved even if the load draws nothing yet; while it is
-off, the load can still start, but the loads after it may use its room. Without it, the
+While it is on, the budget stays reserved even if the load draws nothing yet; while it is
+off, the load can still start, but the loads after it may use its budget. Without it, the
 reservation lasts the load's reaction time. So a car that is not plugged in does not keep
 a boiler after it out all day.
 
 Add only loads that follow their **Allowed
 power**: a load that keeps drawing on top of it takes budget the others were promised.
-Consumers you cannot steer are part of the house.
+Consumers you cannot steer are part of the **house**: the load that is always there and that
+Peak Basket does not steer.
 
 ## Sensors
+
+Peak Basket names what each part of the connection drew the same way: **Grid import** and
+**Solar import** ("Afname net" and "Afname zon" in Dutch), on the connection, on the house
+and on every load.
 
 On the **Grid connection** device ("Aansluiting" in Dutch):
 
 | Sensor | Entity ID | Meaning |
 |---|---|---|
-| Target | `sensor.peak_basket_target` | The window average steered to (W) |
-| House power | `sensor.peak_basket_house_power` | The grid import without the loads (W) |
-| Basket | `sensor.peak_basket_basket` | Target × window length (Wh) |
-| Used | `sensor.peak_basket_used` | Imported this window so far (Wh) |
-| Remaining | `sensor.peak_basket_remaining` | Budget left this window, at the goal (Wh) |
-| House reserve | `sensor.peak_basket_house_reserve` | What the house is expected to use until the window ends (Wh) |
+| Target peak | `sensor.peak_basket_target` | The window average steered to (W) |
+| Basket | `sensor.peak_basket_basket` | Target peak × window length (Wh) |
+| Grid import | `sensor.peak_basket_used` | What the whole connection imported this window so far (Wh) |
+| Budget left | `sensor.peak_basket_remaining` | Budget left this window, at the goal (Wh) |
 | Margin | `sensor.peak_basket_margin` | The margin's share of the basket (Wh) |
-| House from grid | `sensor.peak_basket_house_grid` | The house's share of **Used** (Wh) |
-| Solar, House from solar | `sensor.peak_basket_solar`, `…_house_solar` | With PV power: this window's solar, and the house's share of it (Wh) |
-| Export | `sensor.peak_basket_export` | With PV power or an export counter: exported this window (Wh) |
+| Solar production | `sensor.peak_basket_solar` | With solar power: this window's solar production (Wh) |
+| Export | `sensor.peak_basket_export` | With solar power or an export counter: exported this window (Wh) |
 
-These entity IDs are the same in every language.
+On the **House** device ("Huis"): everything the connection uses that Peak Basket does not
+steer. It is always there and needs no configuration.
+
+| Sensor | Entity ID | Meaning |
+|---|---|---|
+| Power | `sensor.peak_basket_house_power` | The grid import without the loads (W) |
+| Reserve | `sensor.peak_basket_house_reserve` | What the house is expected to use until the window ends (Wh) |
+| Grid import | `sensor.peak_basket_house_grid` | The house's share of the connection's **Grid import** (Wh) |
+| Solar import | `sensor.peak_basket_house_solar` | With solar power: the house's share of the solar production (Wh) |
+
+These entity IDs are the same in every language. Installations from before 0.1.0-rc.5 keep
+them; the house's sensors move from the connection's device to the house's.
 
 On **each load's** device, named after the load:
 
@@ -139,19 +152,26 @@ On **each load's** device, named after the load:
 |---|---|
 | **Allowed power** | The power the load may draw now (W): **the one to steer on** |
 | **Grid limit** | The total import allowed now: the house, this load, and the loads after it (W). For a circuit limit, such as EVCC's |
-| **Mode** | Continuous, pulse – on, pulse – off, or fallback |
+| **Mode** | Continuous, pulse – on, pulse – off, or safe mode |
 | **Run minutes left** | How long the load can still run in this window |
-| **Headroom** | The energy left for this load in this window (Wh) |
-| **From grid**, **From solar** | What this load drew this window (Wh); from solar only with PV power |
+| **Budget left** | The energy left for this load in this window (Wh) |
+| **Grid import**, **Solar import** | What this load drew this window (Wh); solar only with solar power |
 
 A load's entity IDs follow its name and the language Home Assistant has when the load is
 added: for a load named "EV charger", the grid limit is `sensor.ev_charger_grid_limit` on
 an English system and `sensor.ev_charger_netlimiet` on a Dutch one. Copy them from
-**Settings → Entities**. Installations from before 0.1.0-rc.3 keep the entity IDs they have.
+**Settings → Entities**. A load keeps the entity IDs it has: renamed sensors keep their old
+IDs until you change them there.
 
 Every window's energy sensors start from zero; the value just before the reset is the
-window's total. **House from grid** plus every load's **From grid** is the window's
-**Used**. Solar counts for the loads first, in priority order, then for the house.
+window's total. Per window:
+
+- the connection's **Grid import** = the house's **Grid import** + every load's **Grid
+  import**;
+- **Solar production** = the house's **Solar import** + every load's **Solar import** +
+  **Export**.
+
+Solar counts for the loads first, in priority order, then for the house.
 
 ## Using it
 
@@ -188,7 +208,7 @@ default): lower it only when you have measured shorter.
 
 Read **Allowed power** and turn it into the load's setpoint, for example a charging
 current of `allowed power ÷ (voltage × phases)`, rounded down. Stop the load in
-**Pulse – off**, and choose your own safe state for **Fallback**.
+**Pulse – off**, and choose your own safe state for **Safe mode**.
 
 ### A history of who drew from the basket
 
@@ -219,12 +239,12 @@ series:
     type: column
     extend_to: false
     group_by: { duration: 15min, func: last, fill: zero }
-  - entity: sensor.ev_charger_from_grid
+  - entity: sensor.ev_charger_grid_import
     name: EV charger (grid)
     type: column
     extend_to: false
     group_by: { duration: 15min, func: last, fill: zero }
-  - entity: sensor.ev_charger_from_solar
+  - entity: sensor.ev_charger_solar_import
     name: EV charger (solar)
     type: column
     extend_to: false
@@ -246,9 +266,9 @@ What took trial and error with apexcharts-card 2.2.3:
 
 | You see | Check |
 |---|---|
-| **Mode** is **Fallback** | The grid power and the window average (or import counter) must be available and younger than the maximum source age. Some sources only report a change: raise the maximum age, or pick a sensor that reports regularly. |
-| **Used** does not drop to about 0 at a window start | The window average sensor does not cover the region's window. Use the meter's quarter-hour average, or the import counter. |
-| **Basket** never changes | That is right: it changes only when the peak goal changes, or when the monthly peak passes it. Watch **Used** and **Remaining**. |
+| **Mode** is **Safe mode** | The grid power and the window average (or import counter) must be available and younger than the maximum age of a reading. Some sources only report a change: raise the maximum age, or pick a sensor that reports regularly. |
+| The connection's **Grid import** does not drop to about 0 at a window start | The window average sensor does not cover the region's window. Use the meter's quarter-hour average, or the import counter. |
+| **Basket** never changes | That is right: it changes only when the peak goal changes, or when the monthly peak passes it. Watch **Grid import** and **Budget left**. |
 | The load stops at the end of every window | **Pulse – off** means the budget is used up. Lower the house load at that time, or raise the peak goal. |
 
 ## Reporting a problem
