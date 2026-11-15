@@ -83,6 +83,9 @@ A HACS install moves to the Marketplace by itself on the first start of 2026.11.
    entity keeps an idle load that cannot start, such as a car that is not plugged in, from
    holding on to room the others could use.
 4. **More loads:** **Add load** on the Peak Basket page. **Reconfigure** on a load changes it.
+   **Reconfigure** on the Peak Basket entry changes the grid connection's sensors, such as
+   adding a PV source or an export counter later: the loads, the entity IDs and the history
+   stay, and the sensors of a source you remove go with it. The region cannot change.
 5. **Configure** on the grid connection sets:
 
 | Option | Default | Meaning |

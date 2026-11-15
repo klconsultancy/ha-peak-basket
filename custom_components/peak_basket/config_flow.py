@@ -71,21 +71,29 @@ def _number(lo: float, hi: float, step: float, unit: str | None = None) -> Numbe
     return NumberSelector(config)
 
 
+SOURCE_FIELDS = {
+    probatio.Required(CONF_GRID_POWER): _sensor("power"),
+    probatio.Optional(CONF_PV_POWER): _sensor("power"),
+    probatio.Optional(CONF_WINDOW_AVERAGE): _sensor("power"),
+    probatio.Optional(CONF_GRID_IMPORT_ENERGY): _sensor("energy"),
+    probatio.Optional(CONF_GRID_EXPORT_ENERGY): _sensor("energy"),
+    probatio.Optional(CONF_MONTH_PEAK): _sensor("power"),
+    probatio.Optional(CONF_METER_VOLTAGES): _sensor("voltage", multiple=True),
+}
+
 CONNECTION_SCHEMA = probatio.Schema(
     {
         probatio.Required(CONF_NAME, default="Peak Basket"): TextSelector(),
         probatio.Required(CONF_PROFILE, default="be_flanders"): SelectSelector(
             SelectSelectorConfig(options=list(PROFILES), translation_key=CONF_PROFILE)
         ),
-        probatio.Required(CONF_GRID_POWER): _sensor("power"),
-        probatio.Optional(CONF_PV_POWER): _sensor("power"),
-        probatio.Optional(CONF_WINDOW_AVERAGE): _sensor("power"),
-        probatio.Optional(CONF_GRID_IMPORT_ENERGY): _sensor("energy"),
-        probatio.Optional(CONF_GRID_EXPORT_ENERGY): _sensor("energy"),
-        probatio.Optional(CONF_MONTH_PEAK): _sensor("power"),
-        probatio.Optional(CONF_METER_VOLTAGES): _sensor("voltage", multiple=True),
+        **SOURCE_FIELDS,
     }
 )
+
+# Reconfigure: the sources only. The region stays: its window and rules shape every sum.
+SOURCES_SCHEMA = probatio.Schema(SOURCE_FIELDS)
+
 
 OPTIONS_SCHEMA = probatio.Schema(
     {
@@ -177,6 +185,30 @@ class PeakBasketConfigFlow(ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="load",
             data_schema=self.add_suggested_values_to_schema(LOAD_SCHEMA, user_input or {}),
+            errors=errors,
+        )
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Change the grid connection's sources; its loads and entity IDs stay."""
+        entry = self._get_reconfigure_entry()
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            loads = {sub.data.get(CONF_LOAD_POWER) for sub in entry.subentries.values()}
+            if user_input[CONF_GRID_POWER] in loads:
+                errors[CONF_GRID_POWER] = "grid_is_a_load"
+            elif user_input.get(CONF_WINDOW_AVERAGE) or user_input.get(CONF_GRID_IMPORT_ENERGY):
+                return self.async_update_reload_and_abort(
+                    entry, data={CONF_PROFILE: entry.data[CONF_PROFILE], **user_input}
+                )
+            else:
+                errors["base"] = "no_energy_source"
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=self.add_suggested_values_to_schema(
+                SOURCES_SCHEMA, user_input or dict(entry.data)
+            ),
             errors=errors,
         )
 
