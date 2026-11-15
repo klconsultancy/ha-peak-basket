@@ -203,5 +203,10 @@
         "name": "Uit net"
       }
     }
+  },
+  "device": {
+    "connection": {
+      "name": "Aansluiting"
+    }
   }
 }

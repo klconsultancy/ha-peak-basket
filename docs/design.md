@@ -97,6 +97,11 @@ from other integrations, and everything it decides is published as entities.
 | Output | The connection's device: target, house power and the basket fields. Each load's device: its allowed power, grid limit, mode, run minutes and headroom |
 | Manifest | `iot_class: calculated`, `integration_type: service` (an integration card with its own device), no requirements, no credentials |
 
+The connection's device is named by translation ("Grid connection", "Aansluiting"), not
+after the entry: Home Assistant lists it under "Devices that don't belong to a sub-entry",
+next to one device per load. Its sensors set their entity IDs to `sensor.peak_basket_<key>`,
+so they are the same in every language; a load's sensors follow the load's name.
+
 **Pull first.** The load's allowed power, and the total grid limit, are sensors that any
 system reads itself: EVCC (a circuit's dynamic limit from Home Assistant), Node-RED, an
 automation, ESPHome. The executing system keeps its own safety logic and its own fallback
@@ -123,6 +128,11 @@ when Home Assistant is away. Push adapters (a mapping from the advice to a `numb
   the recorder; without it, the window falls back.
 - **Staleness.** A source older than the configured maximum age counts as unavailable. The
   monthly peak is exempt: it changes rarely.
+- **A load's power** that is unavailable or older than the maximum age counts as 0 W, not
+  as a reason to fall back. Many sources only write a change, so a load at rest goes stale,
+  and waiting for a fresh value would lock it out: it would never start, so it would never
+  report. 0 W is the safe side: the load's share counts as house, which leaves the load,
+  and every other load, less room. Only the grid power and the used energy must be fresh.
 - **Phase voltages.** Per phase, the load's voltage, then the meter's, then 230 V. A
   voltage of 180 V or less counts as missing. They set the load's minimum (6 A) and maximum
   (16 A) power.
@@ -133,9 +143,8 @@ Loads go in priority order, lower first. For a load, the house is the grid impor
 its own power and the power of the loads after it: the loads before it count as house,
 the loads after it yield. So the first load gets the whole basket after the house, and a
 later load gets what the earlier ones leave unused right now. When an earlier load starts
-drawing more, a later one's allowed power drops on the next evaluation. When the power of
-any load is unknown, every load falls back, because no load can tell the house from the
-others.
+drawing more, a later one's allowed power drops on the next evaluation. A load whose power
+is unknown counts as 0 W, see below.
 
 The connection's own figures (house power, used, remaining, house reserve) take every
 load out of the house.
