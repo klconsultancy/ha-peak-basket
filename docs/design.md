@@ -147,7 +147,13 @@ drawing more, a later one's allowed power drops on the next evaluation.
 
 An earlier load that may start (continuous or pulse on) but does not draw yet (100 W or
 less) is invisible to the grid. Its allowed power then counts as house for the loads
-after it: otherwise both would count on the same room for up to the reaction time.
+after it, a **claim**: otherwise both would count on the same room for up to the reaction
+time. But an idle load is not always about to start: a car that is not plugged in, or
+full, would keep the loads after it out all day. So a load claims only while it has
+demand: with a **demand entity** (a `binary_sensor`, `switch` or `input_boolean` such as
+"car plugged in" or "thermostat calls for heat"), while that is not off; without one, for
+its reaction time, after which the claim lapses until the load draws or a new window
+starts. A load without demand still gets its allowed power, so it can start.
 
 Each load's **grid limit** is the whole grid's: the house (with those claims), the load's
 allowed power, and the measured power of the loads after it, which yield. A circuit limit

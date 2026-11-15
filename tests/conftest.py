@@ -42,6 +42,7 @@ LOAD_FIELDS = {
     "reaction_s",
     "min_charge_s",
     "extra_a",
+    "demand",
 }
 LOAD_KEYS = {
     "allowed_power",

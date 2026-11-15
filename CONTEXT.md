@@ -50,7 +50,11 @@ loads after it, which yield. For a circuit limit of the system that drives the l
 
 **Claim**
 : The allowed power of a load that may start but does not draw yet. The loads after it
-count it as house.
+count it as house, while the load has demand.
+
+**Demand**
+: Whether a load wants power now, from an optional entity per load (car plugged in,
+thermostat calling for heat). Without one, an idle load's claim lasts its reaction time.
 
 **Mode**
 : Continuous (budget for the load's minimum power until the window ends), pulse on (a burst

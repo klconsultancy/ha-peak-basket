@@ -59,8 +59,11 @@ Peak Basket installs through [HACS](https://hacs.xyz/) as a custom repository:
 2. **The grid connection:** the tariff region and the meter's sensors. Prefer the window
    average over the import counter: it is exact, also right after a restart.
 3. **The first load,** such as the EV charger: its power sensor, its phase voltages (per
-   phase the load's voltage is used, else the meter's, else 230 V), its current range, its
-   reaction time and its minimum run time.
+   phase the load's voltage is used, else the meter's, else 230 V), optionally a
+   **demand** entity (on while it wants power, such as "car plugged in"), its current
+   range, its reaction time and its minimum run time. With more than one load, the demand
+   entity keeps an idle load that cannot start, such as a car that is not plugged in, from
+   holding on to room the others could use.
 4. **More loads:** **Add load** on the Peak Basket page. **Reconfigure** on a load changes it.
 5. **Configure** on the grid connection sets:
 
@@ -73,7 +76,9 @@ Peak Basket installs through [HACS](https://hacs.xyz/) as a custom repository:
 ### Several loads
 
 Each load has a **priority**, lower first. A load gets what the loads before it leave
-unused, and the loads after it yield to it. Add only loads that follow their **Allowed
+unused, and the loads after it yield to it. A load that may start but does not draw yet
+keeps its room from the loads after it while it has **demand**: while its demand entity is
+not off, or, without one, for its reaction time. Add only loads that follow their **Allowed
 power**: a load that keeps drawing on top of it takes budget the others were promised.
 Consumers you cannot steer are part of the house.
 

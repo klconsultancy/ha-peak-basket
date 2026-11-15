@@ -12,6 +12,7 @@ from homeassistant.components.recorder import history
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     ATTR_UNIT_OF_MEASUREMENT,
+    STATE_OFF,
     STATE_UNAVAILABLE,
     STATE_UNKNOWN,
     UnitOfEnergy,
@@ -26,6 +27,7 @@ from homeassistant.util import dt as dt_util
 from homeassistant.util.unit_conversion import EnergyConverter, PowerConverter
 
 from .const import (
+    CONF_DEMAND,
     CONF_EXTRA_A,
     CONF_GRID_EXPORT_ENERGY,
     CONF_GRID_IMPORT_ENERGY,
@@ -94,6 +96,8 @@ class Load:
     title: str
     power_entity: str
     voltage_entities: list[str]
+    demand_entity: str | None
+    """On while the load wants power (plugged in, calling for heat); None when unknown."""
     priority: float
     params: ModelParams
 
@@ -191,6 +195,10 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
         self._import = _Counter("import", window)
         self._export = _Counter("export", window)
         self._published_at = dt_util.now()
+        # Claims of idle loads without a demand entity: since when, and which lapsed.
+        self._claim_started: dict[str, datetime] = {}
+        self._claim_lapsed: set[str] = set()
+        self._claim_window = window
         # Energy added up per window: "solar", "export", "load_solar:<id>", "load_grid:<id>".
         self._sums: dict[str, float] = {}
         self._sums_window = window
@@ -303,10 +311,11 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
                 load.params,
             )
             result = results[load.subentry_id]
-            if (
-                result.mode in {Mode.CONTINUOUS, Mode.PULSE_ON}
-                and powers[k] <= load.params.charging_threshold_w
-            ):
+            idle = powers[k] <= load.params.charging_threshold_w
+            if not idle:
+                self._claim_started.pop(load.subentry_id, None)
+                self._claim_lapsed.discard(load.subentry_id)
+            elif result.mode in {Mode.CONTINUOUS, Mode.PULSE_ON} and self._claims(load, start, now):
                 # It may start but does not draw yet, so the grid does not show it: the
                 # loads after it must not count on the same room.
                 claimed += result.allowed_load_w
@@ -325,6 +334,29 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
         if force or self._must_publish(data, now):
             self._published_at = now
             self.async_set_updated_data(data)
+
+    def _claims(self, load: Load, start: datetime, now: datetime) -> bool:
+        """Whether an idle load that may start keeps its room from the loads after it.
+
+        With a demand entity: while it is not off. Without one, a load that does not
+        start is not told apart from one that cannot (a car not plugged in), so the claim
+        lasts the load's reaction time, then lapses until the load draws or a new window
+        starts.
+        """
+        if load.demand_entity:
+            state = self.hass.states.get(load.demand_entity)
+            return state is None or state.state != STATE_OFF
+        if start != self._claim_window:
+            self._claim_window = start
+            self._claim_started.clear()
+            self._claim_lapsed.clear()
+        if load.subentry_id in self._claim_lapsed:
+            return False
+        since = self._claim_started.setdefault(load.subentry_id, now)
+        if now - since <= timedelta(seconds=load.params.reaction_s):
+            return True
+        self._claim_lapsed.add(load.subentry_id)
+        return False
 
     def _must_publish(self, data: PeakBasketData, now: datetime) -> bool:
         if now - self._published_at >= timedelta(seconds=TICK_SECONDS):
@@ -505,6 +537,7 @@ def _load(subentry_id: str, title: str, data: Mapping[str, Any], margin_w: float
         title=title,
         power_entity=str(cfg[CONF_LOAD_POWER]),
         voltage_entities=list(voltages),
+        demand_entity=cfg.get(CONF_DEMAND) or None,
         priority=float(cfg[CONF_PRIORITY]),
         params=ModelParams(
             margin_w=margin_w,
