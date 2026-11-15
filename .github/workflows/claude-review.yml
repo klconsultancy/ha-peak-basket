@@ -16,6 +16,6 @@ jobs:
       pull-requests: read
       issues: read
       id-token: write # the action authenticates as the Claude GitHub App
-    uses: klconsultancy/workflows/.github/workflows/claude-review.yml@952d3fc8ebebfb1e28dc67b84e64ffd4a54f585d # main
+    uses: klconsultancy/workflows/.github/workflows/claude-review.yml@4263b8df344d10583aa13b6c789e163dde565989 # main
     secrets:
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
