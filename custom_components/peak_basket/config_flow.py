@@ -1,11 +1,18 @@
-"""Config flow: pick existing HA entities as sources; tunables in the options flow."""
+"""Config flow: the grid connection, its tunables, and its loads as subentries."""
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any, override
 
 import probatio
-from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow
+from homeassistant.config_entries import (
+    ConfigEntry,
+    ConfigFlow,
+    ConfigFlowResult,
+    ConfigSubentryFlow,
+    OptionsFlow,
+    SubentryFlowResult,
+)
 from homeassistant.const import CONF_NAME
 from homeassistant.core import callback
 from homeassistant.helpers.selector import (
@@ -24,22 +31,28 @@ from .const import (
     CONF_GRID_IMPORT_ENERGY,
     CONF_GRID_POWER,
     CONF_LOAD_POWER,
+    CONF_LOAD_VOLTAGES,
     CONF_MARGIN,
     CONF_MAX_A,
     CONF_MAX_AGE,
+    CONF_METER_VOLTAGES,
     CONF_MIN_A,
     CONF_MIN_CHARGE,
     CONF_MONTH_PEAK,
     CONF_PEAK_GOAL,
+    CONF_PRIORITY,
     CONF_PROFILE,
     CONF_REACTION,
-    CONF_VOLTAGES,
-    CONF_VOLTAGES_FALLBACK,
     CONF_WINDOW_AVERAGE,
-    DEFAULT_OPTIONS,
+    DEFAULT_ENTRY_OPTIONS,
+    DEFAULT_LOAD,
     DOMAIN,
+    SUBENTRY_LOAD,
 )
 from .model import PROFILES
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 
 def _sensor(device_class: str, *, multiple: bool = False) -> EntitySelector:
@@ -48,15 +61,14 @@ def _sensor(device_class: str, *, multiple: bool = False) -> EntitySelector:
     )
 
 
-def _number(lo: float, hi: float, step: float, unit: str) -> NumberSelector:
-    return NumberSelector(
-        NumberSelectorConfig(
-            min=lo, max=hi, step=step, unit_of_measurement=unit, mode=NumberSelectorMode.BOX
-        )
-    )
+def _number(lo: float, hi: float, step: float, unit: str | None = None) -> NumberSelector:
+    config = NumberSelectorConfig(min=lo, max=hi, step=step, mode=NumberSelectorMode.BOX)
+    if unit is not None:
+        config["unit_of_measurement"] = unit
+    return NumberSelector(config)
 
 
-USER_SCHEMA = probatio.Schema(
+CONNECTION_SCHEMA = probatio.Schema(
     {
         probatio.Required(CONF_NAME, default="Peak Basket"): TextSelector(),
         probatio.Required(CONF_PROFILE, default="be_flanders"): SelectSelector(
@@ -65,10 +77,8 @@ USER_SCHEMA = probatio.Schema(
         probatio.Required(CONF_GRID_POWER): _sensor("power"),
         probatio.Optional(CONF_WINDOW_AVERAGE): _sensor("power"),
         probatio.Optional(CONF_GRID_IMPORT_ENERGY): _sensor("energy"),
-        probatio.Required(CONF_LOAD_POWER): _sensor("power"),
         probatio.Optional(CONF_MONTH_PEAK): _sensor("power"),
-        probatio.Optional(CONF_VOLTAGES): _sensor("voltage", multiple=True),
-        probatio.Optional(CONF_VOLTAGES_FALLBACK): _sensor("voltage", multiple=True),
+        probatio.Optional(CONF_METER_VOLTAGES): _sensor("voltage", multiple=True),
     }
 )
 
@@ -76,51 +86,111 @@ OPTIONS_SCHEMA = probatio.Schema(
     {
         probatio.Required(CONF_PEAK_GOAL): _number(0, 50000, 100, "W"),
         probatio.Required(CONF_MARGIN): _number(0, 2000, 10, "W"),
-        probatio.Required(CONF_REACTION): _number(0, 600, 5, "s"),
-        probatio.Required(CONF_MIN_CHARGE): _number(0, 1800, 10, "s"),
-        probatio.Required(CONF_EXTRA_A): _number(0, 16, 0.5, "A"),
-        probatio.Required(CONF_MIN_A): _number(1, 32, 0.5, "A"),
-        probatio.Required(CONF_MAX_A): _number(1, 63, 0.5, "A"),
         probatio.Required(CONF_MAX_AGE): _number(5, 900, 5, "s"),
     }
 )
 
+LOAD_SCHEMA = probatio.Schema(
+    {
+        probatio.Required(CONF_NAME): TextSelector(),
+        probatio.Required(CONF_LOAD_POWER): _sensor("power"),
+        probatio.Optional(CONF_LOAD_VOLTAGES): _sensor("voltage", multiple=True),
+        probatio.Required(CONF_PRIORITY, default=DEFAULT_LOAD[CONF_PRIORITY]): probatio.All(
+            _number(0, 99, 1), probatio.Coerce(int)
+        ),
+        probatio.Required(CONF_MIN_A, default=DEFAULT_LOAD[CONF_MIN_A]): _number(1, 32, 0.5, "A"),
+        probatio.Required(CONF_MAX_A, default=DEFAULT_LOAD[CONF_MAX_A]): _number(1, 63, 0.5, "A"),
+        probatio.Required(CONF_REACTION, default=DEFAULT_LOAD[CONF_REACTION]): _number(
+            0, 600, 5, "s"
+        ),
+        probatio.Required(CONF_MIN_CHARGE, default=DEFAULT_LOAD[CONF_MIN_CHARGE]): _number(
+            0, 1800, 10, "s"
+        ),
+        probatio.Required(CONF_EXTRA_A, default=DEFAULT_LOAD[CONF_EXTRA_A]): _number(
+            0, 16, 0.5, "A"
+        ),
+    }
+)
+
+
+def _load_errors(entry_data: Mapping[str, Any], user_input: Mapping[str, Any]) -> dict[str, str]:
+    if user_input[CONF_LOAD_POWER] == entry_data.get(CONF_GRID_POWER):
+        return {CONF_LOAD_POWER: "same_as_grid"}
+    return {}
+
+
+def _split_load(user_input: Mapping[str, Any]) -> tuple[str, dict[str, Any]]:
+    data = {k: v for k, v in user_input.items() if k != CONF_NAME}
+    return str(user_input[CONF_NAME]), data
+
 
 class PeakBasketConfigFlow(ConfigFlow, domain=DOMAIN):
-    """Pick the source entities."""
+    """Set up a grid connection and its first load."""
 
-    VERSION = 1
+    VERSION = 2
 
+    def __init__(self) -> None:
+        """Start without a connection."""
+        self._connection: dict[str, Any] = {}
+
+    @override
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
-        """Ask for the sources, and check that the choice can work."""
+        """Ask for the grid connection's sources."""
         errors: dict[str, str] = {}
         if user_input is not None:
-            if user_input[CONF_GRID_POWER] == user_input[CONF_LOAD_POWER]:
-                errors[CONF_LOAD_POWER] = "same_as_grid"
-            elif not (
-                user_input.get(CONF_WINDOW_AVERAGE) or user_input.get(CONF_GRID_IMPORT_ENERGY)
-            ):
-                errors["base"] = "no_energy_source"
-            else:
-                data = {k: v for k, v in user_input.items() if k != CONF_NAME}
-                return self.async_create_entry(
-                    title=user_input[CONF_NAME], data=data, options=dict(DEFAULT_OPTIONS)
-                )
+            if user_input.get(CONF_WINDOW_AVERAGE) or user_input.get(CONF_GRID_IMPORT_ENERGY):
+                self._connection = user_input
+                return await self.async_step_load()
+            errors["base"] = "no_energy_source"
         return self.async_show_form(
             step_id="user",
-            data_schema=self.add_suggested_values_to_schema(USER_SCHEMA, user_input or {}),
+            data_schema=self.add_suggested_values_to_schema(CONNECTION_SCHEMA, user_input or {}),
+            errors=errors,
+        )
+
+    async def async_step_load(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        """Ask for the first load."""
+        errors: dict[str, str] = {}
+        if user_input is not None and not (errors := _load_errors(self._connection, user_input)):
+            title, load = _split_load(user_input)
+            return self.async_create_entry(
+                title=self._connection[CONF_NAME],
+                data={k: v for k, v in self._connection.items() if k != CONF_NAME},
+                options=dict(DEFAULT_ENTRY_OPTIONS),
+                subentries=[
+                    {
+                        "data": load,
+                        "subentry_type": SUBENTRY_LOAD,
+                        "title": title,
+                        "unique_id": None,
+                    }
+                ],
+            )
+        return self.async_show_form(
+            step_id="load",
+            data_schema=self.add_suggested_values_to_schema(LOAD_SCHEMA, user_input or {}),
             errors=errors,
         )
 
     @staticmethod
     @callback
-    def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:  # noqa: ARG004
-        """Return the flow for the tunables."""
+    @override
+    def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
+        """Return the flow for the connection's tunables."""
         return PeakBasketOptionsFlow()
+
+    @classmethod
+    @callback
+    @override
+    def async_get_supported_subentry_types(
+        cls, config_entry: ConfigEntry
+    ) -> dict[str, type[ConfigSubentryFlow]]:
+        """Return the loads, the one kind of subentry."""
+        return {SUBENTRY_LOAD: LoadSubentryFlow}
 
 
 class PeakBasketOptionsFlow(OptionsFlow):
-    """Change the model's tunables."""
+    """Change the grid connection's tunables."""
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Show the tunables, prefilled with the current values."""
@@ -129,6 +199,41 @@ class PeakBasketOptionsFlow(OptionsFlow):
         return self.async_show_form(
             step_id="init",
             data_schema=self.add_suggested_values_to_schema(
-                OPTIONS_SCHEMA, {**DEFAULT_OPTIONS, **self.config_entry.options}
+                OPTIONS_SCHEMA, {**DEFAULT_ENTRY_OPTIONS, **self.config_entry.options}
             ),
+        )
+
+
+class LoadSubentryFlow(ConfigSubentryFlow):
+    """Add or change a load."""
+
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
+        """Add a load."""
+        errors: dict[str, str] = {}
+        if user_input is not None and not (
+            errors := _load_errors(self._get_entry().data, user_input)
+        ):
+            title, data = _split_load(user_input)
+            return self.async_create_entry(title=title, data=data)
+        return self.async_show_form(
+            step_id="user",
+            data_schema=self.add_suggested_values_to_schema(LOAD_SCHEMA, user_input or {}),
+            errors=errors,
+        )
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        """Change a load."""
+        entry = self._get_entry()
+        subentry = self._get_reconfigure_subentry()
+        errors: dict[str, str] = {}
+        if user_input is not None and not (errors := _load_errors(entry.data, user_input)):
+            title, data = _split_load(user_input)
+            return self.async_update_and_abort(entry, subentry, title=title, data=data)
+        suggested = user_input or {CONF_NAME: subentry.title, **subentry.data}
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=self.add_suggested_values_to_schema(LOAD_SCHEMA, suggested),
+            errors=errors,
         )

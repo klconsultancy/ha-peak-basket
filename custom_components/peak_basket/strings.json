@@ -2,56 +2,130 @@
   "config": {
     "step": {
       "user": {
-        "title": "Peak Basket",
-        "description": "Pick the existing sensors Peak Basket calculates from. It does not talk to any device itself.",
+        "title": "Grid connection",
+        "description": "Pick the existing sensors of the grid connection Peak Basket calculates from. It talks to no device itself.",
         "data": {
           "name": "Name",
           "profile": "Tariff region",
           "grid_power": "Grid power",
           "window_average": "Window average power (recommended)",
           "grid_import_energy": "Grid import energy",
-          "load_power": "Load power",
           "month_peak": "Monthly peak (optional)",
-          "voltages": "Load phase voltages (optional)",
-          "voltages_fallback": "Meter phase voltages (optional)"
+          "meter_voltages": "Meter phase voltages (optional)"
         },
         "data_description": {
           "grid_power": "Instantaneous grid power, import positive (e.g. P1 meter). Export may be negative.",
-          "window_average": "The meter's running average for the current window (e.g. HomeWizard “average demand”, DSMR 1.4.0). Preferred over the import counter: exact and survives restarts.",
+          "window_average": "The meter's running average for the current window (e.g. HomeWizard “average demand”, DSMR 1.4.0). Preferred over the import counter: exact and right after a restart.",
           "grid_import_energy": "Import register (1.8.x) as a total-increasing energy counter. Used when no window average is set.",
-          "load_power": "Measured power of the controllable load (e.g. EV charger).",
           "month_peak": "Highest window average this month; the target never goes below it.",
-          "voltages": "Measured voltage per phase at the load, in order L1, L2, L3. Used for the load's minimum and maximum power.",
-          "voltages_fallback": "Used per phase when the load voltage is missing or ≤ 180 V. Otherwise 230 V is assumed."
+          "meter_voltages": "Voltage per phase at the meter, in order L1, L2, L3. Used for every load whose own voltage is missing; otherwise 230 V is assumed."
+        }
+      },
+      "load": {
+        "title": "First load",
+        "description": "The load Peak Basket tells how much power it may draw, such as an EV charger. Add more loads later with “Add load”.",
+        "data": {
+          "name": "Name",
+          "load_power": "Load power",
+          "voltages": "Load phase voltages (optional)",
+          "priority": "Priority",
+          "min_a": "Minimum current",
+          "max_a": "Maximum current",
+          "reaction_s": "Reaction time",
+          "min_charge_s": "Minimum run time",
+          "extra_a": "Extra current in the last 5 minutes"
+        },
+        "data_description": {
+          "load_power": "Measured power of the load.",
+          "voltages": "Measured voltage per phase at the load, in order L1, L2, L3. They set its minimum and maximum power.",
+          "priority": "Lower goes first. A load gets what the loads before it leave unused; the loads after it yield to it.",
+          "reaction_s": "Time between a lower limit and the load actually dropping (e.g. EVCC ≈ 20 s + 30 s cache).",
+          "min_charge_s": "In pulse mode, only start when budget for at least this long is left.",
+          "extra_a": "Catching up allowed above the base in the last 5 minutes of a window."
         }
       }
     },
     "error": {
-      "same_as_grid": "The load sensor must differ from the grid sensor.",
-      "no_energy_source": "Choose a window average or a grid import energy sensor."
+      "no_energy_source": "Choose a window average or a grid import energy sensor.",
+      "same_as_grid": "The load sensor must differ from the grid sensor."
     }
   },
   "options": {
     "step": {
       "init": {
-        "title": "Model parameters",
+        "title": "Grid connection",
         "data": {
           "peak_goal_w": "Peak goal",
           "margin_w": "Safety margin",
-          "reaction_s": "Reaction time",
-          "min_charge_s": "Minimum run time",
-          "extra_a": "Extra current in the last 5 minutes",
-          "min_a": "Minimum current",
-          "max_a": "Maximum current",
           "max_age_s": "Maximum source age"
         },
         "data_description": {
           "peak_goal_w": "Average power per window you allow. The target is the highest of this goal, the monthly peak and the region minimum.",
           "margin_w": "Kept free in every window to absorb measurement and timing errors.",
-          "reaction_s": "Time between a lower limit and the load actually dropping (e.g. EVCC ≈ 20 s + 30 s cache).",
-          "min_charge_s": "In pulse mode, only start when budget for at least this long is left.",
           "max_age_s": "Older source values count as unavailable and trigger the safe fallback."
         }
+      }
+    }
+  },
+  "config_subentries": {
+    "load": {
+      "entry_type": "Load",
+      "initiate_flow": {
+        "user": "Add load"
+      },
+      "step": {
+        "user": {
+          "title": "Add load",
+          "description": "A load Peak Basket tells how much power it may draw.",
+          "data": {
+            "name": "Name",
+            "load_power": "Load power",
+            "voltages": "Load phase voltages (optional)",
+            "priority": "Priority",
+            "min_a": "Minimum current",
+            "max_a": "Maximum current",
+            "reaction_s": "Reaction time",
+            "min_charge_s": "Minimum run time",
+            "extra_a": "Extra current in the last 5 minutes"
+          },
+          "data_description": {
+            "load_power": "Measured power of the load.",
+            "voltages": "Measured voltage per phase at the load, in order L1, L2, L3. They set its minimum and maximum power.",
+            "priority": "Lower goes first. A load gets what the loads before it leave unused; the loads after it yield to it.",
+            "reaction_s": "Time between a lower limit and the load actually dropping (e.g. EVCC ≈ 20 s + 30 s cache).",
+            "min_charge_s": "In pulse mode, only start when budget for at least this long is left.",
+            "extra_a": "Catching up allowed above the base in the last 5 minutes of a window."
+          }
+        },
+        "reconfigure": {
+          "title": "Change load",
+          "description": "A load Peak Basket tells how much power it may draw.",
+          "data": {
+            "name": "Name",
+            "load_power": "Load power",
+            "voltages": "Load phase voltages (optional)",
+            "priority": "Priority",
+            "min_a": "Minimum current",
+            "max_a": "Maximum current",
+            "reaction_s": "Reaction time",
+            "min_charge_s": "Minimum run time",
+            "extra_a": "Extra current in the last 5 minutes"
+          },
+          "data_description": {
+            "load_power": "Measured power of the load.",
+            "voltages": "Measured voltage per phase at the load, in order L1, L2, L3. They set its minimum and maximum power.",
+            "priority": "Lower goes first. A load gets what the loads before it leave unused; the loads after it yield to it.",
+            "reaction_s": "Time between a lower limit and the load actually dropping (e.g. EVCC ≈ 20 s + 30 s cache).",
+            "min_charge_s": "In pulse mode, only start when budget for at least this long is left.",
+            "extra_a": "Catching up allowed above the base in the last 5 minutes of a window."
+          }
+        }
+      },
+      "error": {
+        "same_as_grid": "The load sensor must differ from the grid sensor."
+      },
+      "abort": {
+        "reconfigure_successful": "The load was changed."
       }
     }
   },
@@ -64,8 +138,8 @@
   },
   "entity": {
     "sensor": {
-      "allowed_load_power": {
-        "name": "Allowed load power"
+      "allowed_power": {
+        "name": "Allowed power"
       },
       "grid_limit": {
         "name": "Grid limit"
@@ -82,6 +156,9 @@
       "charge_minutes": {
         "name": "Run minutes left"
       },
+      "load_room": {
+        "name": "Headroom"
+      },
       "target": {
         "name": "Target"
       },
@@ -94,17 +171,14 @@
       "used": {
         "name": "Used"
       },
+      "remaining": {
+        "name": "Remaining"
+      },
       "house_reserve": {
         "name": "House reserve"
       },
-      "load_room": {
-        "name": "Load headroom"
-      },
       "margin": {
         "name": "Margin"
-      },
-      "remaining": {
-        "name": "Remaining"
       }
     }
   }

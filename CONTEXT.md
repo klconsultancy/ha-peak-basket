@@ -24,17 +24,29 @@ billed minimum.
 **Margin**
 : Power kept free in every window for measurement and timing errors.
 
+**Grid connection**
+: One meter and its basket: the config entry. Its sources (grid power, window average or
+import counter, monthly peak, meter voltages) and its tunables (peak goal, margin, maximum
+source age) belong to it.
+
 **House**
-: Everything that is not controlled: the grid import minus the load's power.
+: Everything that is not controlled: the grid import minus the power of every load.
 
 **Load**
-: A controllable consumer, such as an EV charger. Today an entry has one.
+: A controllable consumer, such as an EV charger, a boiler or a battery charging: a
+subentry of the grid connection, with its own device and sensors. Its power sensor,
+phase voltages, current range, reaction time and minimum run time belong to it.
+
+**Priority**
+: The order loads go in, lower first. A load counts the loads before it as house, and the
+loads after it yield to it: they get what it leaves unused right now.
 
 **Allowed load power**
 : What the load may draw now: the pull output that EVCC, Node-RED or an automation reads.
 
 **Grid limit**
-: The total grid import allowed now, house and load together: for a circuit limit.
+: Per load, the total grid import allowed now with that load included: for a circuit limit
+of the system that drives it.
 
 **Mode**
 : Continuous (budget for the load's minimum power until the window ends), pulse on (a burst

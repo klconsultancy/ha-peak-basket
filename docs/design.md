@@ -69,8 +69,9 @@ from other integrations, and everything it decides is published as entities.
 
 | | |
 |---|---|
-| Input | Entity selectors: grid power, the window average or the import register, the load's power, optionally the monthly peak and phase voltages |
-| Output | Sensors: the allowed power of the load, the total grid limit, the mode, the basket fields |
+| Entry | One grid connection: grid power, the window average or the import register, optionally the monthly peak and the meter's phase voltages; the peak goal, margin and maximum source age |
+| Subentries | One per controllable load: its power sensor, optionally its phase voltages, its priority, current range, reaction time and minimum run time |
+| Output | The connection's device: target, house power and the basket fields. Each load's device: its allowed power, grid limit, mode, run minutes and headroom |
 | Manifest | `iot_class: calculated`, `integration_type: service` (an integration card with its own device), no requirements, no credentials |
 
 **Pull first.** The load's allowed power, and the total grid limit, are sensors that any
@@ -97,6 +98,19 @@ when Home Assistant is away. Push adapters (a mapping from the advice to a `numb
 - **Phase voltages.** Per phase, the load's voltage, then the meter's, then 230 V. A
   voltage of 180 V or less counts as missing. They set the load's minimum (6 A) and maximum
   (16 A) power.
+
+### Several loads
+
+Loads go in priority order, lower first. For a load, the house is the grid import minus
+its own power and the power of the loads after it: the loads before it count as house,
+the loads after it yield. So the first load gets the whole basket after the house, and a
+later load gets what the earlier ones leave unused right now. When an earlier load starts
+drawing more, a later one's allowed power drops on the next evaluation. When the power of
+any load is unknown, every load falls back, because no load can tell the house from the
+others.
+
+The connection's own figures (house power, used, remaining, house reserve) take every
+load out of the house.
 
 ## The model
 
@@ -194,8 +208,8 @@ loads with priority and solar attribution, region profiles, no hardware of its o
 
 ## Roadmap
 
-1. More loads as config subentries (heat pump, boiler, battery), each with its priority,
-   minimum and maximum power, and minimum run and pause times.
+1. Load kinds beyond a current range: on/off (a boiler) and minimum pause times (a heat
+   pump's compressor).
 2. Push adapters through Home Assistant services.
 3. Profiles for other regions, and the 12-month target strategy.
 4. A Lovelace card: the basket per window as a stacked bar (house, load, reserve, room,

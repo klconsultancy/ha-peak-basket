@@ -77,6 +77,9 @@ class ModelInput:
 
     A missing or invalid phase uses the nominal voltage; ``None`` means nominal on all.
     """
+    other_loads_w: float | None = 0.0
+    """Measured power of the loads with a lower priority: they yield to this load, so they
+    do not count as house. ``None`` when one of them is unknown."""
 
 
 @dataclass(frozen=True)
@@ -148,8 +151,11 @@ def evaluate(
     margin_wh = params.margin_w * window / SECONDS_PER_HOUR
 
     house: float | None = None
-    if inp.grid_import_w is not None and inp.load_w is not None:
-        house = max(max(inp.grid_import_w, 0.0) - max(inp.load_w, 0.0), 0.0)
+    if inp.grid_import_w is not None and inp.load_w is not None and inp.other_loads_w is not None:
+        house = max(
+            max(inp.grid_import_w, 0.0) - max(inp.load_w, 0.0) - max(inp.other_loads_w, 0.0),
+            0.0,
+        )
 
     if house is None or inp.window_import_wh is None:
         # Behave like a static circuit at the goal: safe, never unlimited.

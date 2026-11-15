@@ -2,56 +2,130 @@
   "config": {
     "step": {
       "user": {
-        "title": "Peak Basket",
-        "description": "Kies de bestaande sensoren waaruit Peak Basket rekent. Ze praat zelf met geen enkel toestel.",
+        "title": "Netaansluiting",
+        "description": "Kies de bestaande sensoren van de netaansluiting waaruit Peak Basket rekent. Ze praat zelf met geen enkel toestel.",
         "data": {
           "name": "Naam",
           "profile": "Tariefregio",
           "grid_power": "Netvermogen",
           "window_average": "Venstergemiddelde vermogen (aanbevolen)",
           "grid_import_energy": "Energie afname net",
-          "load_power": "Vermogen afnemer",
           "month_peak": "Maandpiek (optioneel)",
-          "voltages": "Spanning per fase afnemer (optioneel)",
-          "voltages_fallback": "Spanning per fase meter (optioneel)"
+          "meter_voltages": "Spanning per fase meter (optioneel)"
         },
         "data_description": {
           "grid_power": "Ogenblikkelijk netvermogen, afname positief (bv. P1-meter). Injectie mag negatief zijn.",
-          "window_average": "Lopend gemiddelde van de meter voor het huidige venster (bv. HomeWizard “gemiddeld verbruik”, DSMR 1.4.0). Te verkiezen boven de afnameteller: exact en herstartbestendig.",
+          "window_average": "Lopend gemiddelde van de meter voor het huidige venster (bv. HomeWizard “gemiddeld verbruik”, DSMR 1.4.0). Te verkiezen boven de afnameteller: exact, ook meteen na een herstart.",
           "grid_import_energy": "Afnameregister (1.8.x) als oplopende energieteller. Gebruikt als er geen venstergemiddelde gekozen is.",
-          "load_power": "Gemeten vermogen van de stuurbare afnemer (bv. laadpaal).",
           "month_peak": "Hoogste venstergemiddelde deze maand; de target zakt nooit daaronder.",
-          "voltages": "Gemeten spanning per fase aan de afnemer, in volgorde L1, L2, L3. Voor het min- en max-vermogen van de afnemer.",
-          "voltages_fallback": "Per fase gebruikt als de spanning van de afnemer ontbreekt of ≤ 180 V is. Anders wordt 230 V aangenomen."
+          "meter_voltages": "Spanning per fase aan de meter, in volgorde L1, L2, L3. Gebruikt voor elke afnemer waarvan de eigen spanning ontbreekt; anders wordt 230 V aangenomen."
+        }
+      },
+      "load": {
+        "title": "Eerste afnemer",
+        "description": "De afnemer waaraan Peak Basket doorgeeft hoeveel vermogen hij mag nemen, bv. een laadpaal. Meer afnemers voeg je later toe met “Afnemer toevoegen”.",
+        "data": {
+          "name": "Naam",
+          "load_power": "Vermogen afnemer",
+          "voltages": "Spanning per fase afnemer (optioneel)",
+          "priority": "Prioriteit",
+          "min_a": "Minimale stroom",
+          "max_a": "Maximale stroom",
+          "reaction_s": "Reactietijd",
+          "min_charge_s": "Minimale looptijd",
+          "extra_a": "Extra stroom laatste 5 minuten"
+        },
+        "data_description": {
+          "load_power": "Gemeten vermogen van de afnemer.",
+          "voltages": "Gemeten spanning per fase aan de afnemer, in volgorde L1, L2, L3. Bepaalt zijn minimale en maximale vermogen.",
+          "priority": "Lager gaat voor. Een afnemer krijgt wat de afnemers vóór hem onbenut laten; de afnemers na hem wijken voor hem.",
+          "reaction_s": "Tijd tussen een lagere limiet en het effectief zakken van de afnemer (bv. EVCC ≈ 20 s + 30 s cache).",
+          "min_charge_s": "In pulsmodus pas starten als er nog minstens zo lang budget is.",
+          "extra_a": "Toegestaan inhalen boven de basis in de laatste 5 minuten van een venster."
         }
       }
     },
     "error": {
-      "same_as_grid": "De sensor van de afnemer moet verschillen van de netsensor.",
-      "no_energy_source": "Kies een venstergemiddelde of een sensor voor energie afname net."
+      "no_energy_source": "Kies een venstergemiddelde of een sensor voor energie afname net.",
+      "same_as_grid": "De sensor van de afnemer moet verschillen van de netsensor."
     }
   },
   "options": {
     "step": {
       "init": {
-        "title": "Modelparameters",
+        "title": "Netaansluiting",
         "data": {
           "peak_goal_w": "Piekdoel",
           "margin_w": "Veiligheidsmarge",
-          "reaction_s": "Reactietijd",
-          "min_charge_s": "Minimale looptijd",
-          "extra_a": "Extra stroom laatste 5 minuten",
-          "min_a": "Minimale stroom",
-          "max_a": "Maximale stroom",
           "max_age_s": "Maximale leeftijd bron"
         },
         "data_description": {
           "peak_goal_w": "Gemiddeld vermogen per venster dat je toelaat. De target is het hoogste van dit doel, de maandpiek en het regiominimum.",
           "margin_w": "Blijft elk venster vrij om meet- en timingfouten op te vangen.",
-          "reaction_s": "Tijd tussen een lagere limiet en het effectief zakken van de afnemer (bv. EVCC ≈ 20 s + 30 s cache).",
-          "min_charge_s": "In pulsmodus pas starten als er nog minstens zo lang budget is.",
           "max_age_s": "Oudere bronwaarden tellen als niet beschikbaar en geven de veilige fallback."
         }
+      }
+    }
+  },
+  "config_subentries": {
+    "load": {
+      "entry_type": "Afnemer",
+      "initiate_flow": {
+        "user": "Afnemer toevoegen"
+      },
+      "step": {
+        "user": {
+          "title": "Afnemer toevoegen",
+          "description": "Een afnemer waaraan Peak Basket doorgeeft hoeveel vermogen hij mag nemen.",
+          "data": {
+            "name": "Naam",
+            "load_power": "Vermogen afnemer",
+            "voltages": "Spanning per fase afnemer (optioneel)",
+            "priority": "Prioriteit",
+            "min_a": "Minimale stroom",
+            "max_a": "Maximale stroom",
+            "reaction_s": "Reactietijd",
+            "min_charge_s": "Minimale looptijd",
+            "extra_a": "Extra stroom laatste 5 minuten"
+          },
+          "data_description": {
+            "load_power": "Gemeten vermogen van de afnemer.",
+            "voltages": "Gemeten spanning per fase aan de afnemer, in volgorde L1, L2, L3. Bepaalt zijn minimale en maximale vermogen.",
+            "priority": "Lager gaat voor. Een afnemer krijgt wat de afnemers vóór hem onbenut laten; de afnemers na hem wijken voor hem.",
+            "reaction_s": "Tijd tussen een lagere limiet en het effectief zakken van de afnemer (bv. EVCC ≈ 20 s + 30 s cache).",
+            "min_charge_s": "In pulsmodus pas starten als er nog minstens zo lang budget is.",
+            "extra_a": "Toegestaan inhalen boven de basis in de laatste 5 minuten van een venster."
+          }
+        },
+        "reconfigure": {
+          "title": "Afnemer wijzigen",
+          "description": "Een afnemer waaraan Peak Basket doorgeeft hoeveel vermogen hij mag nemen.",
+          "data": {
+            "name": "Naam",
+            "load_power": "Vermogen afnemer",
+            "voltages": "Spanning per fase afnemer (optioneel)",
+            "priority": "Prioriteit",
+            "min_a": "Minimale stroom",
+            "max_a": "Maximale stroom",
+            "reaction_s": "Reactietijd",
+            "min_charge_s": "Minimale looptijd",
+            "extra_a": "Extra stroom laatste 5 minuten"
+          },
+          "data_description": {
+            "load_power": "Gemeten vermogen van de afnemer.",
+            "voltages": "Gemeten spanning per fase aan de afnemer, in volgorde L1, L2, L3. Bepaalt zijn minimale en maximale vermogen.",
+            "priority": "Lager gaat voor. Een afnemer krijgt wat de afnemers vóór hem onbenut laten; de afnemers na hem wijken voor hem.",
+            "reaction_s": "Tijd tussen een lagere limiet en het effectief zakken van de afnemer (bv. EVCC ≈ 20 s + 30 s cache).",
+            "min_charge_s": "In pulsmodus pas starten als er nog minstens zo lang budget is.",
+            "extra_a": "Toegestaan inhalen boven de basis in de laatste 5 minuten van een venster."
+          }
+        }
+      },
+      "error": {
+        "same_as_grid": "De sensor van de afnemer moet verschillen van de netsensor."
+      },
+      "abort": {
+        "reconfigure_successful": "De afnemer is gewijzigd."
       }
     }
   },
@@ -64,8 +138,8 @@
   },
   "entity": {
     "sensor": {
-      "allowed_load_power": {
-        "name": "Toegestaan vermogen afnemer"
+      "allowed_power": {
+        "name": "Toegestaan vermogen"
       },
       "grid_limit": {
         "name": "Netlimiet"
@@ -82,6 +156,9 @@
       "charge_minutes": {
         "name": "Resterende laadminuten"
       },
+      "load_room": {
+        "name": "Ruimte"
+      },
       "target": {
         "name": "Target"
       },
@@ -94,17 +171,14 @@
       "used": {
         "name": "Verbruikt"
       },
+      "remaining": {
+        "name": "Nog beschikbaar"
+      },
       "house_reserve": {
         "name": "Reserve huis"
       },
-      "load_room": {
-        "name": "Ruimte afnemer"
-      },
       "margin": {
         "name": "Marge"
-      },
-      "remaining": {
-        "name": "Nog beschikbaar"
       }
     }
   }
