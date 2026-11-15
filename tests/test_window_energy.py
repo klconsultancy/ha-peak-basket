@@ -133,8 +133,9 @@ async def test_export_counter_gives_the_export(
         hass, freezer, "2026-11-15T12:15:37+00:00", grid=-500, ev=0, pv=2000, export_kwh=10.012
     )
     assert float(value(hass, "export")) == 12
-    # PV 2000 W for 36 s = 20 Wh, of which 12 Wh exported: the house used 8 Wh of it.
-    assert float(value(hass, "house_solar")) == 8
+    # PV 2000 W for 37 s (1 s after the boundary, then 36 s) = 20.6 Wh, of which 12 Wh
+    # exported: the house used 8.6 Wh of it.
+    assert float(value(hass, "house_solar")) == 9
 
 
 async def test_export_counter_without_pv(
@@ -253,3 +254,14 @@ async def test_restart_does_not_restore_an_earlier_window(
     await _at(hass, freezer, "2026-11-15T12:21:36+00:00", grid=-500, ev=2000, pv=3000)
     assert float(value(hass, "solar")) == 30
     assert float(value(hass, "load_grid")) == 0
+
+
+async def test_an_interval_across_the_boundary_counts_its_part_in_the_new_window(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    await _at(hass, freezer, "2026-11-15T12:14:58+00:00", grid=-500, ev=2000, pv=3000)
+    await setup_entry(hass, _sources(pv_power=PV))
+    # 2 s before the boundary, 34 s after: the new window gets 34 s of 3000 W.
+    await _at(hass, freezer, "2026-11-15T12:15:34+00:00", grid=-500, ev=2000, pv=3000)
+    assert float(value(hass, "solar")) == 28  # 28.3 Wh
+    assert float(value(hass, "load_solar")) == 19  # 18.9 Wh

@@ -102,6 +102,12 @@ after the entry: Home Assistant lists it under "Devices that don't belong to a s
 next to one device per load. Its sensors set their entity IDs to `sensor.peak_basket_<key>`,
 so they are the same in every language; a load's sensors follow the load's name.
 
+**Loads follow their allowed power.** A load's grid limit counts on the loads after it
+to yield and on the load itself to stay within its allowed power. A load that ignores it
+draws on top of the budget for the whole window. Add only loads that something drives
+from their allowed power (EVCC, an automation, a push adapter later); measure any other
+consumer, such as a heat pump you only want to watch, as house.
+
 **Pull first.** The load's allowed power, and the total grid limit, are sensors that any
 system reads itself: EVCC (a circuit's dynamic limit from Home Assistant), Node-RED, an
 automation, ESPHome. The executing system keeps its own safety logic and its own fallback
