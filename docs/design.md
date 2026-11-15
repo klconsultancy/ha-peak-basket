@@ -113,7 +113,10 @@ when Home Assistant is away. Push adapters (a mapping from the advice to a `numb
   window's length, so a sensor over another period gives a wrong budget without a
   warning. It is exact, also right after a restart. The meter resets it a second or two after the
   boundary; a value reported before the window started still belongs to the previous
-  window and counts as nothing used yet. Otherwise the coordinator takes the import
+  window and counts as nothing used yet. A reading with a fresh timestamp can still carry
+  the previous window (a reader that polls just before the meter resets), so the used
+  energy is also capped at what any connection can import since the boundary: the seconds
+  into the window times 69 kW (3 x 230 V x 100 A). Otherwise the coordinator takes the import
   register's difference since the window start. Its start value is the last fresh reading
   before the boundary; that may count a few seconds of the previous window, which errs on
   the safe side. After a restart mid-window, it reads the register at the window start from
