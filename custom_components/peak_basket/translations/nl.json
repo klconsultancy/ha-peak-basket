@@ -2,52 +2,52 @@
   "config": {
     "step": {
       "user": {
-        "title": "Netaansluiting",
-        "description": "Kies de bestaande sensoren van de netaansluiting waaruit Peak Basket rekent. Ze praat zelf met geen enkel toestel.",
+        "title": "Aansluiting",
+        "description": "Kies de sensoren van je aansluiting waarmee Peak Basket rekent. Peak Basket stuurt zelf geen toestellen aan: het publiceert sensoren die je laadpaal of automatisaties lezen.",
         "data": {
           "name": "Naam",
           "profile": "Tariefregio",
           "grid_power": "Netvermogen",
-          "pv_power": "PV-vermogen (optioneel)",
-          "window_average": "Venstergemiddelde vermogen (aanbevolen)",
-          "grid_import_energy": "Energie afname net",
-          "grid_export_energy": "Energie injectie net (optioneel)",
+          "pv_power": "Vermogen zonnepanelen (omvormer) (optioneel)",
+          "window_average": "Kwartiergemiddelde van de meter (aanbevolen)",
+          "grid_import_energy": "Afnameteller (1.8.x)",
+          "grid_export_energy": "Injectieteller (2.8.x) (optioneel)",
           "month_peak": "Maandpiek (optioneel)",
-          "meter_voltages": "Spanning per fase meter (optioneel)"
+          "meter_voltages": "Spanning per fase aan de meter (optioneel)"
         },
         "data_description": {
-          "grid_power": "Ogenblikkelijk netvermogen, afname positief (bv. P1-meter). Injectie mag negatief zijn.",
-          "pv_power": "Ogenblikkelijke zonneproductie. Voegt per venster de zon- en netenergie toe, per afnemer en voor het huis. Injectie volgt uit een negatief netvermogen.",
-          "window_average": "Lopend gemiddelde van de meter voor het huidige venster (bv. HomeWizard “gemiddeld verbruik”, DSMR 1.4.0). Het moet over het venster van de regio middelen (15 minuten in Vlaanderen) en bij elk vensterbegin terugvallen naar ongeveer 0; een gemiddelde over 5 minuten of een uur geeft een fout budget. Te verkiezen boven de afnameteller: exact, ook meteen na een herstart.",
-          "grid_import_energy": "Afnameregister (1.8.x) als oplopende energieteller. Gebruikt als er geen venstergemiddelde gekozen is.",
-          "grid_export_energy": "Injectieregister (2.8.x) als oplopende energieteller. Geeft de exacte injectie per venster; zonder volgt injectie uit een negatief netvermogen.",
-          "month_peak": "Hoogste venstergemiddelde deze maand; de target zakt nooit daaronder.",
+          "grid_power": "Het actuele vermogen aan de meter, afname positief (bv. P1-meter). Injectie mag negatief zijn.",
+          "pv_power": "Het actuele vermogen van je omvormer. Daarmee toont Peak Basket per meetperiode hoeveel zonne-energie elke afnemer gebruikte, het huis inbegrepen. 's Nachts of offline telt hij als 0 W. Injectie volgt uit een negatief netvermogen.",
+          "window_average": "Het lopende gemiddelde van de meter over de huidige meetperiode (bv. HomeWizard “gemiddeld verbruik”, DSMR 1.4.0). Het moet middelen over de meetperiode van de regio (een kwartier in Vlaanderen) en bij elk begin ervan terugvallen naar ongeveer 0; een gemiddelde over 5 minuten of een uur geeft een verkeerd budget. Te verkiezen boven de afnameteller: exact, ook meteen na een herstart.",
+          "grid_import_energy": "De oplopende teller van de afgenomen energie (register 1.8.x). Gebruikt als er geen kwartiergemiddelde gekozen is.",
+          "grid_export_energy": "De oplopende teller van de geïnjecteerde energie (register 2.8.x). Geeft de exacte injectie per meetperiode; zonder volgt injectie uit een negatief netvermogen.",
+          "month_peak": "Het hoogste kwartiergemiddelde van deze maand; de streefpiek zakt nooit daaronder.",
           "meter_voltages": "Spanning per fase aan de meter, in volgorde L1, L2, L3. Gebruikt voor elke afnemer waarvan de eigen spanning ontbreekt; anders wordt 230 V aangenomen."
         }
       },
       "load": {
         "title": "Eerste afnemer",
-        "description": "De afnemer waaraan Peak Basket doorgeeft hoeveel vermogen hij mag nemen, bv. een laadpaal. Meer afnemers voeg je later toe met “Afnemer toevoegen”.",
+        "description": "Een toestel dat zijn vermogen kan aanpassen, zoals een laadpaal. Peak Basket berekent hoeveel het mag nemen; je laadpaal of een automatisatie stuurt het toestel. Het huis telt al mee: dat is de afnemer die Peak Basket niet stuurt. Meer afnemers voeg je later toe met “Afnemer toevoegen”.",
         "data": {
           "name": "Naam",
-          "load_power": "Vermogen afnemer",
-          "voltages": "Spanning per fase afnemer (optioneel)",
+          "load_power": "Gemeten vermogen",
+          "voltages": "Spanning per fase aan de afnemer (optioneel)",
           "priority": "Prioriteit",
-          "demand": "Vraag naar vermogen (optioneel)",
+          "demand": "Wil vermogen (optioneel)",
           "min_a": "Minimale stroom",
           "max_a": "Maximale stroom",
           "reaction_s": "Reactietijd",
           "min_charge_s": "Minimale looptijd",
-          "extra_a": "Extra stroom laatste 5 minuten"
+          "extra_a": "Inhaalstroom laatste 5 minuten"
         },
         "data_description": {
-          "load_power": "Gemeten vermogen van de afnemer.",
-          "voltages": "Gemeten spanning per fase aan de afnemer, in volgorde L1, L2, L3. Bepaalt zijn minimale en maximale vermogen.",
+          "load_power": "Het gemeten vermogen van de afnemer.",
+          "voltages": "Gemeten spanning per fase aan de afnemer, in volgorde L1, L2, L3. Samen met de minimale en maximale stroom bepalen ze het vermogensbereik. Zonder: de spanning van de meter, anders 230 V.",
           "priority": "Lager gaat voor. Een afnemer krijgt wat de afnemers vóór hem onbenut laten; de afnemers na hem wijken voor hem.",
-          "demand": "Alleen nodig met meerdere afnemers. Een entiteit die aan staat zolang deze afnemer stroom wil, zoals “auto aangesloten” van een laadpaal of een thermostaat die warmte vraagt. Zolang ze aan staat, houdt Peak Basket ruimte voor deze afnemer vrij, ook als hij nog niets trekt; de afnemers na hem kunnen die ruimte dan niet gebruiken. Zonder deze entiteit duurt die reservering de reactietijd.",
+          "demand": "Alleen nodig met meerdere afnemers. Een entiteit die aan staat zolang deze afnemer stroom wil, zoals “auto aangesloten” van een laadpaal of een thermostaat die warmte vraagt. Zolang ze aan staat, houdt Peak Basket budget voor deze afnemer vrij, ook als hij nog niets trekt; de afnemers na hem kunnen dat budget dan niet gebruiken. Zonder deze entiteit duurt die reservering de reactietijd.",
           "reaction_s": "Tijd tussen een lagere limiet en het effectief zakken van de afnemer (bv. EVCC ≈ 20 s + 30 s cache).",
-          "min_charge_s": "In pulsmodus pas starten als er nog minstens zo lang budget is.",
-          "extra_a": "Toegestaan inhalen boven de basis in de laatste 5 minuten van een venster."
+          "min_charge_s": "Is er niet genoeg voor de hele meetperiode, dan start de afnemer pas als er nog minstens zo lang budget over is.",
+          "extra_a": "Hoeveel stroom per fase de afnemer in de laatste 5 minuten van een meetperiode extra mag nemen, om een rustig begin in te halen."
         }
       },
       "reconfigure": {
@@ -55,26 +55,26 @@
         "description": "Wijzig de sensoren van de aansluiting. De afnemers, de entity-ID's en de historiek blijven. De regio kan niet wijzigen.",
         "data": {
           "grid_power": "Netvermogen",
-          "pv_power": "PV-vermogen (optioneel)",
-          "window_average": "Venstergemiddelde vermogen (aanbevolen)",
-          "grid_import_energy": "Energie afname net",
-          "grid_export_energy": "Energie injectie net (optioneel)",
+          "pv_power": "Vermogen zonnepanelen (omvormer) (optioneel)",
+          "window_average": "Kwartiergemiddelde van de meter (aanbevolen)",
+          "grid_import_energy": "Afnameteller (1.8.x)",
+          "grid_export_energy": "Injectieteller (2.8.x) (optioneel)",
           "month_peak": "Maandpiek (optioneel)",
-          "meter_voltages": "Spanning per fase meter (optioneel)"
+          "meter_voltages": "Spanning per fase aan de meter (optioneel)"
         },
         "data_description": {
-          "grid_power": "Ogenblikkelijk netvermogen, afname positief (bv. P1-meter). Injectie mag negatief zijn.",
-          "pv_power": "Ogenblikkelijke zonneproductie. Voegt per venster de zon- en netenergie toe, per afnemer en voor het huis. Injectie volgt uit een negatief netvermogen.",
-          "window_average": "Lopend gemiddelde van de meter voor het huidige venster (bv. HomeWizard “gemiddeld verbruik”, DSMR 1.4.0). Het moet over het venster van de regio middelen (15 minuten in Vlaanderen) en bij elk vensterbegin terugvallen naar ongeveer 0; een gemiddelde over 5 minuten of een uur geeft een fout budget. Te verkiezen boven de afnameteller: exact, ook meteen na een herstart.",
-          "grid_import_energy": "Afnameregister (1.8.x) als oplopende energieteller. Gebruikt als er geen venstergemiddelde gekozen is.",
-          "grid_export_energy": "Injectieregister (2.8.x) als oplopende energieteller. Geeft de exacte injectie per venster; zonder volgt injectie uit een negatief netvermogen.",
-          "month_peak": "Hoogste venstergemiddelde deze maand; de target zakt nooit daaronder.",
+          "grid_power": "Het actuele vermogen aan de meter, afname positief (bv. P1-meter). Injectie mag negatief zijn.",
+          "pv_power": "Het actuele vermogen van je omvormer. Daarmee toont Peak Basket per meetperiode hoeveel zonne-energie elke afnemer gebruikte, het huis inbegrepen. 's Nachts of offline telt hij als 0 W. Injectie volgt uit een negatief netvermogen.",
+          "window_average": "Het lopende gemiddelde van de meter over de huidige meetperiode (bv. HomeWizard “gemiddeld verbruik”, DSMR 1.4.0). Het moet middelen over de meetperiode van de regio (een kwartier in Vlaanderen) en bij elk begin ervan terugvallen naar ongeveer 0; een gemiddelde over 5 minuten of een uur geeft een verkeerd budget. Te verkiezen boven de afnameteller: exact, ook meteen na een herstart.",
+          "grid_import_energy": "De oplopende teller van de afgenomen energie (register 1.8.x). Gebruikt als er geen kwartiergemiddelde gekozen is.",
+          "grid_export_energy": "De oplopende teller van de geïnjecteerde energie (register 2.8.x). Geeft de exacte injectie per meetperiode; zonder volgt injectie uit een negatief netvermogen.",
+          "month_peak": "Het hoogste kwartiergemiddelde van deze maand; de streefpiek zakt nooit daaronder.",
           "meter_voltages": "Spanning per fase aan de meter, in volgorde L1, L2, L3. Gebruikt voor elke afnemer waarvan de eigen spanning ontbreekt; anders wordt 230 V aangenomen."
         }
       }
     },
     "error": {
-      "no_energy_source": "Kies een venstergemiddelde of een sensor voor energie afname net.",
+      "no_energy_source": "Kies een kwartiergemiddelde of een afnameteller.",
       "same_as_grid": "De sensor van de afnemer moet verschillen van de netsensor.",
       "grid_is_a_load": "Deze sensor is het vermogen van een afnemer: het netvermogen moet dat van de meter zijn."
     },
@@ -85,16 +85,16 @@
   "options": {
     "step": {
       "init": {
-        "title": "Netaansluiting",
+        "title": "Aansluiting",
         "data": {
           "peak_goal_w": "Piekdoel",
           "margin_w": "Veiligheidsmarge",
-          "max_age_s": "Maximale leeftijd bron"
+          "max_age_s": "Maximale ouderdom van een meting"
         },
         "data_description": {
-          "peak_goal_w": "Gemiddeld vermogen per venster dat je toelaat. De target is het hoogste van dit doel, de maandpiek en het regiominimum.",
-          "margin_w": "Blijft elk venster vrij om meet- en timingfouten op te vangen.",
-          "max_age_s": "Oudere bronwaarden tellen als niet beschikbaar en geven de veilige fallback."
+          "peak_goal_w": "Het gemiddelde vermogen per meetperiode dat je toelaat. De streefpiek is het hoogste van dit doel, de maandpiek en het minimum van de regio.",
+          "margin_w": "Blijft in elke meetperiode onaangeroerd, om meet- en timingfouten op te vangen.",
+          "max_age_s": "Een oudere meting van het netvermogen, het kwartiergemiddelde of de afnameteller telt als ontbrekend en zet de afnemers in de veilige stand. Een afnemer of de omvormer zonder recente meting telt als 0 W."
         }
       }
     }
@@ -108,52 +108,52 @@
       "step": {
         "user": {
           "title": "Afnemer toevoegen",
-          "description": "Een afnemer waaraan Peak Basket doorgeeft hoeveel vermogen hij mag nemen.",
+          "description": "Een toestel dat zijn vermogen kan aanpassen, zoals een laadpaal. Peak Basket berekent hoeveel het mag nemen; je laadpaal of een automatisatie stuurt het toestel.",
           "data": {
             "name": "Naam",
-            "load_power": "Vermogen afnemer",
-            "voltages": "Spanning per fase afnemer (optioneel)",
+            "load_power": "Gemeten vermogen",
+            "voltages": "Spanning per fase aan de afnemer (optioneel)",
             "priority": "Prioriteit",
-            "demand": "Vraag naar vermogen (optioneel)",
+            "demand": "Wil vermogen (optioneel)",
             "min_a": "Minimale stroom",
             "max_a": "Maximale stroom",
             "reaction_s": "Reactietijd",
             "min_charge_s": "Minimale looptijd",
-            "extra_a": "Extra stroom laatste 5 minuten"
+            "extra_a": "Inhaalstroom laatste 5 minuten"
           },
           "data_description": {
-            "load_power": "Gemeten vermogen van de afnemer.",
-            "voltages": "Gemeten spanning per fase aan de afnemer, in volgorde L1, L2, L3. Bepaalt zijn minimale en maximale vermogen.",
+            "load_power": "Het gemeten vermogen van de afnemer.",
+            "voltages": "Gemeten spanning per fase aan de afnemer, in volgorde L1, L2, L3. Samen met de minimale en maximale stroom bepalen ze het vermogensbereik. Zonder: de spanning van de meter, anders 230 V.",
             "priority": "Lager gaat voor. Een afnemer krijgt wat de afnemers vóór hem onbenut laten; de afnemers na hem wijken voor hem.",
-            "demand": "Alleen nodig met meerdere afnemers. Een entiteit die aan staat zolang deze afnemer stroom wil, zoals “auto aangesloten” van een laadpaal of een thermostaat die warmte vraagt. Zolang ze aan staat, houdt Peak Basket ruimte voor deze afnemer vrij, ook als hij nog niets trekt; de afnemers na hem kunnen die ruimte dan niet gebruiken. Zonder deze entiteit duurt die reservering de reactietijd.",
+            "demand": "Alleen nodig met meerdere afnemers. Een entiteit die aan staat zolang deze afnemer stroom wil, zoals “auto aangesloten” van een laadpaal of een thermostaat die warmte vraagt. Zolang ze aan staat, houdt Peak Basket budget voor deze afnemer vrij, ook als hij nog niets trekt; de afnemers na hem kunnen dat budget dan niet gebruiken. Zonder deze entiteit duurt die reservering de reactietijd.",
             "reaction_s": "Tijd tussen een lagere limiet en het effectief zakken van de afnemer (bv. EVCC ≈ 20 s + 30 s cache).",
-            "min_charge_s": "In pulsmodus pas starten als er nog minstens zo lang budget is.",
-            "extra_a": "Toegestaan inhalen boven de basis in de laatste 5 minuten van een venster."
+            "min_charge_s": "Is er niet genoeg voor de hele meetperiode, dan start de afnemer pas als er nog minstens zo lang budget over is.",
+            "extra_a": "Hoeveel stroom per fase de afnemer in de laatste 5 minuten van een meetperiode extra mag nemen, om een rustig begin in te halen."
           }
         },
         "reconfigure": {
           "title": "Afnemer wijzigen",
-          "description": "Een afnemer waaraan Peak Basket doorgeeft hoeveel vermogen hij mag nemen.",
+          "description": "Een toestel dat zijn vermogen kan aanpassen, zoals een laadpaal. Peak Basket berekent hoeveel het mag nemen; je laadpaal of een automatisatie stuurt het toestel.",
           "data": {
             "name": "Naam",
-            "load_power": "Vermogen afnemer",
-            "voltages": "Spanning per fase afnemer (optioneel)",
+            "load_power": "Gemeten vermogen",
+            "voltages": "Spanning per fase aan de afnemer (optioneel)",
             "priority": "Prioriteit",
-            "demand": "Vraag naar vermogen (optioneel)",
+            "demand": "Wil vermogen (optioneel)",
             "min_a": "Minimale stroom",
             "max_a": "Maximale stroom",
             "reaction_s": "Reactietijd",
             "min_charge_s": "Minimale looptijd",
-            "extra_a": "Extra stroom laatste 5 minuten"
+            "extra_a": "Inhaalstroom laatste 5 minuten"
           },
           "data_description": {
-            "load_power": "Gemeten vermogen van de afnemer.",
-            "voltages": "Gemeten spanning per fase aan de afnemer, in volgorde L1, L2, L3. Bepaalt zijn minimale en maximale vermogen.",
+            "load_power": "Het gemeten vermogen van de afnemer.",
+            "voltages": "Gemeten spanning per fase aan de afnemer, in volgorde L1, L2, L3. Samen met de minimale en maximale stroom bepalen ze het vermogensbereik. Zonder: de spanning van de meter, anders 230 V.",
             "priority": "Lager gaat voor. Een afnemer krijgt wat de afnemers vóór hem onbenut laten; de afnemers na hem wijken voor hem.",
-            "demand": "Alleen nodig met meerdere afnemers. Een entiteit die aan staat zolang deze afnemer stroom wil, zoals “auto aangesloten” van een laadpaal of een thermostaat die warmte vraagt. Zolang ze aan staat, houdt Peak Basket ruimte voor deze afnemer vrij, ook als hij nog niets trekt; de afnemers na hem kunnen die ruimte dan niet gebruiken. Zonder deze entiteit duurt die reservering de reactietijd.",
+            "demand": "Alleen nodig met meerdere afnemers. Een entiteit die aan staat zolang deze afnemer stroom wil, zoals “auto aangesloten” van een laadpaal of een thermostaat die warmte vraagt. Zolang ze aan staat, houdt Peak Basket budget voor deze afnemer vrij, ook als hij nog niets trekt; de afnemers na hem kunnen dat budget dan niet gebruiken. Zonder deze entiteit duurt die reservering de reactietijd.",
             "reaction_s": "Tijd tussen een lagere limiet en het effectief zakken van de afnemer (bv. EVCC ≈ 20 s + 30 s cache).",
-            "min_charge_s": "In pulsmodus pas starten als er nog minstens zo lang budget is.",
-            "extra_a": "Toegestaan inhalen boven de basis in de laatste 5 minuten van een venster."
+            "min_charge_s": "Is er niet genoeg voor de hele meetperiode, dan start de afnemer pas als er nog minstens zo lang budget over is.",
+            "extra_a": "Hoeveel stroom per fase de afnemer in de laatste 5 minuten van een meetperiode extra mag nemen, om een rustig begin in te halen."
           }
         }
       },
@@ -186,59 +186,62 @@
           "continuous": "Continu",
           "pulse_on": "Puls – aan",
           "pulse_off": "Puls – uit",
-          "fallback": "Fallback"
+          "fallback": "Veilige stand"
         }
       },
       "charge_minutes": {
-        "name": "Resterende laadminuten"
+        "name": "Resterende minuten"
       },
       "load_room": {
-        "name": "Ruimte"
+        "name": "Resterend budget"
       },
       "target": {
-        "name": "Target"
+        "name": "Streefpiek"
       },
       "house_power": {
-        "name": "Vermogen huis"
+        "name": "Vermogen"
       },
       "basket": {
         "name": "Korf"
       },
       "used": {
-        "name": "Verbruikt"
+        "name": "Afname net"
       },
       "remaining": {
-        "name": "Nog beschikbaar"
+        "name": "Resterend budget"
       },
       "house_reserve": {
-        "name": "Reserve huis"
+        "name": "Reserve"
       },
       "margin": {
         "name": "Marge"
       },
       "solar": {
-        "name": "Zon"
+        "name": "Zonneproductie"
       },
       "export": {
         "name": "Injectie"
       },
       "house_solar": {
-        "name": "Huis uit zon"
+        "name": "Afname zon"
       },
       "house_grid": {
-        "name": "Huis uit net"
+        "name": "Afname net"
       },
       "load_solar": {
-        "name": "Uit zon"
+        "name": "Afname zon"
       },
       "load_grid": {
-        "name": "Uit net"
+        "name": "Afname net"
       }
     }
   },
   "device": {
     "connection": {
       "name": "Aansluiting"
+    },
+    "house": {
+      "name": "Huis"
     }
   }
 }

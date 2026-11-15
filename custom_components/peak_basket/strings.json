@@ -3,34 +3,34 @@
     "step": {
       "user": {
         "title": "Grid connection",
-        "description": "Pick the existing sensors of the grid connection Peak Basket calculates from. It talks to no device itself.",
+        "description": "Pick the sensors of your grid connection Peak Basket calculates with. It does not control any device itself: it publishes sensors your charger or automations read.",
         "data": {
           "name": "Name",
           "profile": "Tariff region",
           "grid_power": "Grid power",
-          "pv_power": "PV power (optional)",
-          "window_average": "Window average power (recommended)",
-          "grid_import_energy": "Grid import energy",
-          "grid_export_energy": "Grid export energy (optional)",
+          "pv_power": "Solar power (inverter) (optional)",
+          "window_average": "Meter's window average (recommended)",
+          "grid_import_energy": "Import counter (1.8.x)",
+          "grid_export_energy": "Export counter (2.8.x) (optional)",
           "month_peak": "Monthly peak (optional)",
           "meter_voltages": "Meter phase voltages (optional)"
         },
         "data_description": {
-          "grid_power": "Instantaneous grid power, import positive (e.g. P1 meter). Export may be negative.",
-          "pv_power": "Instantaneous solar production. Adds the window's solar and grid energy per load and for the house. Export is read from a negative grid power.",
-          "window_average": "The meter's running average for the current window (e.g. HomeWizard “average demand”, DSMR 1.4.0). It must average over the region's window (15 minutes in Flanders) and drop back to about 0 at every window start; a 5-minute average or an hourly one gives a wrong budget. Preferred over the import counter: exact, also right after a restart.",
-          "grid_import_energy": "Import register (1.8.x) as a total-increasing energy counter. Used when no window average is set.",
-          "grid_export_energy": "Export register (2.8.x) as a total-increasing energy counter. Gives the exact export per window; without it, export comes from a negative grid power.",
-          "month_peak": "Highest window average this month; the target never goes below it.",
+          "grid_power": "The current power at the meter, import positive (e.g. P1 meter). Export may be negative.",
+          "pv_power": "Your inverter's current power. With it Peak Basket shows per window how much solar energy each load used, the house included. At night or offline it counts as 0 W. Export is read from a negative grid power.",
+          "window_average": "The meter's running average over the current window (e.g. HomeWizard “average demand”, DSMR 1.4.0). It must average over the region's window (15 minutes in Flanders) and drop back to about 0 at every window start; a 5-minute average or an hourly one gives a wrong budget. Preferred over the import counter: exact, also right after a restart.",
+          "grid_import_energy": "The total-increasing counter of imported energy (register 1.8.x). Used when no window average is set.",
+          "grid_export_energy": "The total-increasing counter of exported energy (register 2.8.x). Gives the exact export per window; without it, export comes from a negative grid power.",
+          "month_peak": "The highest window average this month; the target peak never goes below it.",
           "meter_voltages": "Voltage per phase at the meter, in order L1, L2, L3. Used for every load whose own voltage is missing; otherwise 230 V is assumed."
         }
       },
       "load": {
         "title": "First load",
-        "description": "The load Peak Basket tells how much power it may draw, such as an EV charger. Add more loads later with “Add load”.",
+        "description": "A device that can adjust its power, such as an EV charger. Peak Basket calculates how much it may draw; your charger or an automation controls it. The house is already counted: it is the load Peak Basket does not steer. Add more loads later with “Add load”.",
         "data": {
           "name": "Name",
-          "load_power": "Load power",
+          "load_power": "Measured power",
           "voltages": "Load phase voltages (optional)",
           "priority": "Priority",
           "demand": "Wants power (optional)",
@@ -38,16 +38,16 @@
           "max_a": "Maximum current",
           "reaction_s": "Reaction time",
           "min_charge_s": "Minimum run time",
-          "extra_a": "Extra current in the last 5 minutes"
+          "extra_a": "Catch-up current, last 5 minutes"
         },
         "data_description": {
-          "load_power": "Measured power of the load.",
-          "voltages": "Measured voltage per phase at the load, in order L1, L2, L3. They set its minimum and maximum power.",
+          "load_power": "The load's measured power.",
+          "voltages": "Measured voltage per phase at the load, in order L1, L2, L3. With the minimum and maximum current they set its power range. Without them: the meter's voltage, else 230 V.",
           "priority": "Lower goes first. A load gets what the loads before it leave unused; the loads after it yield to it.",
-          "demand": "Only needed with more than one load. An entity that is on while this load wants power, such as the “vehicle connected” sensor of a charger or a thermostat calling for heat. While it is on, Peak Basket keeps room for this load even before it draws anything, so the loads after it cannot use that room. Without it, that reservation lasts the reaction time.",
+          "demand": "Only needed with more than one load. An entity that is on while this load wants power, such as the “vehicle connected” sensor of a charger or a thermostat calling for heat. While it is on, Peak Basket keeps budget for this load even before it draws anything, so the loads after it cannot use that budget. Without it, that reservation lasts the reaction time.",
           "reaction_s": "Time between a lower limit and the load actually dropping (e.g. EVCC ≈ 20 s + 30 s cache).",
-          "min_charge_s": "In pulse mode, only start when budget for at least this long is left.",
-          "extra_a": "Catching up allowed above the base in the last 5 minutes of a window."
+          "min_charge_s": "When there is not enough for the whole window, the load only starts when budget for at least this long is left.",
+          "extra_a": "How much extra current per phase the load may draw in the last 5 minutes of a window, to catch up on a quiet start."
         }
       },
       "reconfigure": {
@@ -55,28 +55,28 @@
         "description": "Change the sensors of the grid connection. Its loads, its entity IDs and its history stay. The region cannot change.",
         "data": {
           "grid_power": "Grid power",
-          "pv_power": "PV power (optional)",
-          "window_average": "Window average power (recommended)",
-          "grid_import_energy": "Grid import energy",
-          "grid_export_energy": "Grid export energy (optional)",
+          "pv_power": "Solar power (inverter) (optional)",
+          "window_average": "Meter's window average (recommended)",
+          "grid_import_energy": "Import counter (1.8.x)",
+          "grid_export_energy": "Export counter (2.8.x) (optional)",
           "month_peak": "Monthly peak (optional)",
           "meter_voltages": "Meter phase voltages (optional)"
         },
         "data_description": {
-          "grid_power": "Instantaneous grid power, import positive (e.g. P1 meter). Export may be negative.",
-          "pv_power": "Instantaneous solar production. Adds the window's solar and grid energy per load and for the house. Export is read from a negative grid power.",
-          "window_average": "The meter's running average for the current window (e.g. HomeWizard “average demand”, DSMR 1.4.0). It must average over the region's window (15 minutes in Flanders) and drop back to about 0 at every window start; a 5-minute average or an hourly one gives a wrong budget. Preferred over the import counter: exact, also right after a restart.",
-          "grid_import_energy": "Import register (1.8.x) as a total-increasing energy counter. Used when no window average is set.",
-          "grid_export_energy": "Export register (2.8.x) as a total-increasing energy counter. Gives the exact export per window; without it, export comes from a negative grid power.",
-          "month_peak": "Highest window average this month; the target never goes below it.",
+          "grid_power": "The current power at the meter, import positive (e.g. P1 meter). Export may be negative.",
+          "pv_power": "Your inverter's current power. With it Peak Basket shows per window how much solar energy each load used, the house included. At night or offline it counts as 0 W. Export is read from a negative grid power.",
+          "window_average": "The meter's running average over the current window (e.g. HomeWizard “average demand”, DSMR 1.4.0). It must average over the region's window (15 minutes in Flanders) and drop back to about 0 at every window start; a 5-minute average or an hourly one gives a wrong budget. Preferred over the import counter: exact, also right after a restart.",
+          "grid_import_energy": "The total-increasing counter of imported energy (register 1.8.x). Used when no window average is set.",
+          "grid_export_energy": "The total-increasing counter of exported energy (register 2.8.x). Gives the exact export per window; without it, export comes from a negative grid power.",
+          "month_peak": "The highest window average this month; the target peak never goes below it.",
           "meter_voltages": "Voltage per phase at the meter, in order L1, L2, L3. Used for every load whose own voltage is missing; otherwise 230 V is assumed."
         }
       }
     },
     "error": {
-      "no_energy_source": "Choose a window average or a grid import energy sensor.",
-      "same_as_grid": "The load sensor must differ from the grid sensor.",
-      "grid_is_a_load": "This sensor is a load's power sensor: the grid power must be the meter's."
+      "no_energy_source": "Choose a window average or an import counter.",
+      "same_as_grid": "The load's sensor must differ from the grid sensor.",
+      "grid_is_a_load": "This sensor is a load's power: the grid power must be the meter's."
     },
     "abort": {
       "reconfigure_successful": "The grid connection was changed."
@@ -89,12 +89,12 @@
         "data": {
           "peak_goal_w": "Peak goal",
           "margin_w": "Safety margin",
-          "max_age_s": "Maximum source age"
+          "max_age_s": "Maximum age of a reading"
         },
         "data_description": {
-          "peak_goal_w": "Average power per window you allow. The target is the highest of this goal, the monthly peak and the region minimum.",
-          "margin_w": "Kept free in every window to absorb measurement and timing errors.",
-          "max_age_s": "Older source values count as unavailable and trigger the safe fallback."
+          "peak_goal_w": "The average power per window you allow. The target peak is the highest of this goal, the monthly peak and the region's minimum.",
+          "margin_w": "Left untouched in every window, to absorb measurement and timing errors.",
+          "max_age_s": "An older reading of the grid power, the window average or the import counter counts as missing and puts the loads in safe mode. A load or the inverter without a recent reading counts as 0 W."
         }
       }
     }
@@ -108,10 +108,10 @@
       "step": {
         "user": {
           "title": "Add load",
-          "description": "A load Peak Basket tells how much power it may draw.",
+          "description": "A device that can adjust its power, such as an EV charger. Peak Basket calculates how much it may draw; your charger or an automation controls it.",
           "data": {
             "name": "Name",
-            "load_power": "Load power",
+            "load_power": "Measured power",
             "voltages": "Load phase voltages (optional)",
             "priority": "Priority",
             "demand": "Wants power (optional)",
@@ -119,24 +119,24 @@
             "max_a": "Maximum current",
             "reaction_s": "Reaction time",
             "min_charge_s": "Minimum run time",
-            "extra_a": "Extra current in the last 5 minutes"
+            "extra_a": "Catch-up current, last 5 minutes"
           },
           "data_description": {
-            "load_power": "Measured power of the load.",
-            "voltages": "Measured voltage per phase at the load, in order L1, L2, L3. They set its minimum and maximum power.",
+            "load_power": "The load's measured power.",
+            "voltages": "Measured voltage per phase at the load, in order L1, L2, L3. With the minimum and maximum current they set its power range. Without them: the meter's voltage, else 230 V.",
             "priority": "Lower goes first. A load gets what the loads before it leave unused; the loads after it yield to it.",
-            "demand": "Only needed with more than one load. An entity that is on while this load wants power, such as the “vehicle connected” sensor of a charger or a thermostat calling for heat. While it is on, Peak Basket keeps room for this load even before it draws anything, so the loads after it cannot use that room. Without it, that reservation lasts the reaction time.",
+            "demand": "Only needed with more than one load. An entity that is on while this load wants power, such as the “vehicle connected” sensor of a charger or a thermostat calling for heat. While it is on, Peak Basket keeps budget for this load even before it draws anything, so the loads after it cannot use that budget. Without it, that reservation lasts the reaction time.",
             "reaction_s": "Time between a lower limit and the load actually dropping (e.g. EVCC ≈ 20 s + 30 s cache).",
-            "min_charge_s": "In pulse mode, only start when budget for at least this long is left.",
-            "extra_a": "Catching up allowed above the base in the last 5 minutes of a window."
+            "min_charge_s": "When there is not enough for the whole window, the load only starts when budget for at least this long is left.",
+            "extra_a": "How much extra current per phase the load may draw in the last 5 minutes of a window, to catch up on a quiet start."
           }
         },
         "reconfigure": {
           "title": "Change load",
-          "description": "A load Peak Basket tells how much power it may draw.",
+          "description": "A device that can adjust its power, such as an EV charger. Peak Basket calculates how much it may draw; your charger or an automation controls it.",
           "data": {
             "name": "Name",
-            "load_power": "Load power",
+            "load_power": "Measured power",
             "voltages": "Load phase voltages (optional)",
             "priority": "Priority",
             "demand": "Wants power (optional)",
@@ -144,21 +144,21 @@
             "max_a": "Maximum current",
             "reaction_s": "Reaction time",
             "min_charge_s": "Minimum run time",
-            "extra_a": "Extra current in the last 5 minutes"
+            "extra_a": "Catch-up current, last 5 minutes"
           },
           "data_description": {
-            "load_power": "Measured power of the load.",
-            "voltages": "Measured voltage per phase at the load, in order L1, L2, L3. They set its minimum and maximum power.",
+            "load_power": "The load's measured power.",
+            "voltages": "Measured voltage per phase at the load, in order L1, L2, L3. With the minimum and maximum current they set its power range. Without them: the meter's voltage, else 230 V.",
             "priority": "Lower goes first. A load gets what the loads before it leave unused; the loads after it yield to it.",
-            "demand": "Only needed with more than one load. An entity that is on while this load wants power, such as the “vehicle connected” sensor of a charger or a thermostat calling for heat. While it is on, Peak Basket keeps room for this load even before it draws anything, so the loads after it cannot use that room. Without it, that reservation lasts the reaction time.",
+            "demand": "Only needed with more than one load. An entity that is on while this load wants power, such as the “vehicle connected” sensor of a charger or a thermostat calling for heat. While it is on, Peak Basket keeps budget for this load even before it draws anything, so the loads after it cannot use that budget. Without it, that reservation lasts the reaction time.",
             "reaction_s": "Time between a lower limit and the load actually dropping (e.g. EVCC ≈ 20 s + 30 s cache).",
-            "min_charge_s": "In pulse mode, only start when budget for at least this long is left.",
-            "extra_a": "Catching up allowed above the base in the last 5 minutes of a window."
+            "min_charge_s": "When there is not enough for the whole window, the load only starts when budget for at least this long is left.",
+            "extra_a": "How much extra current per phase the load may draw in the last 5 minutes of a window, to catch up on a quiet start."
           }
         }
       },
       "error": {
-        "same_as_grid": "The load sensor must differ from the grid sensor."
+        "same_as_grid": "The load's sensor must differ from the grid sensor."
       },
       "abort": {
         "reconfigure_successful": "The load was changed."
@@ -186,59 +186,62 @@
           "continuous": "Continuous",
           "pulse_on": "Pulse – on",
           "pulse_off": "Pulse – off",
-          "fallback": "Fallback"
+          "fallback": "Safe mode"
         }
       },
       "charge_minutes": {
         "name": "Run minutes left"
       },
       "load_room": {
-        "name": "Headroom"
+        "name": "Budget left"
       },
       "target": {
-        "name": "Target"
+        "name": "Target peak"
       },
       "house_power": {
-        "name": "House power"
+        "name": "Power"
       },
       "basket": {
         "name": "Basket"
       },
       "used": {
-        "name": "Used"
+        "name": "Grid import"
       },
       "remaining": {
-        "name": "Remaining"
+        "name": "Budget left"
       },
       "house_reserve": {
-        "name": "House reserve"
+        "name": "Reserve"
       },
       "margin": {
         "name": "Margin"
       },
       "solar": {
-        "name": "Solar"
+        "name": "Solar production"
       },
       "export": {
         "name": "Export"
       },
       "house_solar": {
-        "name": "House from solar"
+        "name": "Solar import"
       },
       "house_grid": {
-        "name": "House from grid"
+        "name": "Grid import"
       },
       "load_solar": {
-        "name": "From solar"
+        "name": "Solar import"
       },
       "load_grid": {
-        "name": "From grid"
+        "name": "Grid import"
       }
     }
   },
   "device": {
     "connection": {
       "name": "Grid connection"
+    },
+    "house": {
+      "name": "House"
     }
   }
 }

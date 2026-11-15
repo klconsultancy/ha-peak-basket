@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from contextlib import suppress
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
 from homeassistant.components.sensor import (
@@ -42,6 +42,8 @@ class ConnectionSensorDescription(SensorEntityDescription):
     value_fn: Callable[[PeakBasketCoordinator], float | None]
     restore: bool = False
     """Hand the last value back to the coordinator after a restart, within its window."""
+    house: bool = False
+    """Shown on the house's device rather than the connection's."""
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -74,6 +76,7 @@ CONNECTION_SENSORS: tuple[ConnectionSensorDescription, ...] = (
     ConnectionSensorDescription(
         key="house_power",
         translation_key="house_power",
+        house=True,
         device_class=SensorDeviceClass.POWER,
         native_unit_of_measurement=UnitOfPower.WATT,
         state_class=SensorStateClass.MEASUREMENT,
@@ -88,6 +91,7 @@ CONNECTION_SENSORS: tuple[ConnectionSensorDescription, ...] = (
             suggested_display_precision=0,
             entity_category=category,
             value_fn=fn,
+            house=key == "house_reserve",
         )
         for key, fn, category in (
             ("basket", lambda c: _wh(c.data.connection.basket_wh), None),
@@ -162,8 +166,11 @@ def _energy_sensor[D: (ConnectionSensorDescription, LoadSensorDescription)](
 
 # Who drew from the basket this window. Sums the coordinator adds up itself are restored
 # after a restart; the rest it derives.
-HOUSE_GRID = _energy_sensor(
-    ConnectionSensorDescription, "house_grid", lambda c: _wh(c.data.flows.house_grid)
+HOUSE_GRID = replace(
+    _energy_sensor(
+        ConnectionSensorDescription, "house_grid", lambda c: _wh(c.data.flows.house_grid)
+    ),
+    house=True,
 )
 LOAD_GRID = _energy_sensor(
     LoadSensorDescription,
@@ -175,8 +182,11 @@ SOLAR = (
     _energy_sensor(
         ConnectionSensorDescription, "solar", lambda c: _wh(c.data.flows.solar), restore=True
     ),
-    _energy_sensor(
-        ConnectionSensorDescription, "house_solar", lambda c: _wh(c.data.flows.house_solar)
+    replace(
+        _energy_sensor(
+            ConnectionSensorDescription, "house_solar", lambda c: _wh(c.data.flows.house_solar)
+        ),
+        house=True,
     ),
 )
 LOAD_SOLAR = _energy_sensor(
@@ -228,7 +238,7 @@ async def async_setup_entry(
     for registered in er.async_entries_for_config_entry(registry, entry.entry_id):
         if registered.domain == "sensor" and registered.unique_id not in expected:
             registry.async_remove(registered.entity_id)
-    async_add_entities(ConnectionSensor(coordinator, d) for d in connection_sensors)
+    async_add_entities(ConnectionSensor(coordinator, d, connection.id) for d in connection_sensors)
     for load in coordinator.loads:
         async_add_entities(
             (LoadSensor(coordinator, load, d, connection.id) for d in load_sensors),
@@ -245,21 +255,38 @@ def _connection_device(coordinator: PeakBasketCoordinator) -> DeviceInfo:
     )
 
 
+def _house_device(coordinator: PeakBasketCoordinator, connection_device_id: str) -> DeviceInfo:
+    """Describe the house: what the connection uses that Peak Basket does not steer."""
+    return DeviceInfo(
+        identifiers={(DOMAIN, f"{coordinator.config_entry.entry_id}_house")},
+        translation_key="house",
+        entry_type=DeviceEntryType.SERVICE,
+        via_device_id=connection_device_id,
+    )
+
+
 class ConnectionSensor(CoordinatorEntity[PeakBasketCoordinator], RestoreEntity, SensorEntity):
-    """One value of the grid connection's basket."""
+    """One value of the grid connection's basket, or of the house."""
 
     _attr_has_entity_name = True
     entity_description: ConnectionSensorDescription
 
     def __init__(
-        self, coordinator: PeakBasketCoordinator, description: ConnectionSensorDescription
+        self,
+        coordinator: PeakBasketCoordinator,
+        description: ConnectionSensorDescription,
+        connection_device_id: str,
     ) -> None:
-        """Attach the sensor to the connection's service device."""
+        """Attach the sensor to the connection's device, or the house's under it."""
         super().__init__(coordinator)
         self.entity_description = description
         entry = coordinator.config_entry
         self._attr_unique_id = f"{entry.entry_id}_{description.key}"
-        self._attr_device_info = _connection_device(coordinator)
+        self._attr_device_info = (
+            _house_device(coordinator, connection_device_id)
+            if description.house
+            else _connection_device(coordinator)
+        )
         # The device's name is translated: keep new entity IDs the same in every language.
         self.entity_id = f"sensor.{DOMAIN}_{description.key}"
 
