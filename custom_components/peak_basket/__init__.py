@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 from homeassistant.config_entries import ConfigSubentry
 from homeassistant.const import Platform
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.translation import async_get_translations
 
 from .const import (
     CONF_EXTRA_A,
@@ -30,6 +31,7 @@ if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
 
 PLATFORMS = [Platform.SENSOR]
+CURRENT_VERSION = 2
 
 # Version 1 kept one load in the entry. Its sensors move to the load, under these keys.
 _V1_LOAD_SENSORS = {
@@ -61,8 +63,17 @@ async def async_unload_entry(hass: HomeAssistant, entry: PeakBasketConfigEntry) 
 async def async_migrate_entry(hass: HomeAssistant, entry: PeakBasketConfigEntry) -> bool:
     """Move the one load of a version 1 entry into a load subentry.
 
-    Home Assistant only calls this for an older version: 1, the only one before 2.
+    Home Assistant also calls this when only the minor version changes: a version 2 entry
+    has nothing to move. A newer version than this code knows is refused.
     """
+    if entry.version > CURRENT_VERSION:
+        return False
+    if entry.version == 1:
+        await _async_migrate_v1(hass, entry)
+    return True
+
+
+async def _async_migrate_v1(hass: HomeAssistant, entry: PeakBasketConfigEntry) -> None:
     data = dict(entry.data)
     options = dict(entry.options)
     load = {
@@ -74,8 +85,12 @@ async def async_migrate_entry(hass: HomeAssistant, entry: PeakBasketConfigEntry)
         load[CONF_LOAD_VOLTAGES] = voltages
     if meter := data.pop("voltages_fallback", None):
         data[CONF_METER_VOLTAGES] = meter
+    translations = await async_get_translations(
+        hass, hass.config.language, "config_subentries", [DOMAIN]
+    )
+    title = translations.get(f"component.{DOMAIN}.config_subentries.load.entry_type", "Load")
     subentry = ConfigSubentry(
-        data=MappingProxyType(load), subentry_type=SUBENTRY_LOAD, title="Load", unique_id=None
+        data=MappingProxyType(load), subentry_type=SUBENTRY_LOAD, title=title, unique_id=None
     )
     hass.config_entries.async_add_subentry(entry, subentry)
     hass.config_entries.async_update_entry(entry, data=data, options=options, version=2)
@@ -90,7 +105,6 @@ async def async_migrate_entry(hass: HomeAssistant, entry: PeakBasketConfigEntry)
                 config_subentry_id=subentry.subentry_id,
             )
     LOGGER.info("Moved the load of %s into a load subentry", entry.title)
-    return True
 
 
 async def _async_reload(hass: HomeAssistant, entry: PeakBasketConfigEntry) -> None:
