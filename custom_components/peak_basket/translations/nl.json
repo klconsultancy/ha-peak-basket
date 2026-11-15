@@ -11,6 +11,7 @@
           "pv_power": "PV-vermogen (optioneel)",
           "window_average": "Venstergemiddelde vermogen (aanbevolen)",
           "grid_import_energy": "Energie afname net",
+          "grid_export_energy": "Energie injectie net (optioneel)",
           "month_peak": "Maandpiek (optioneel)",
           "meter_voltages": "Spanning per fase meter (optioneel)"
         },
@@ -19,6 +20,7 @@
           "pv_power": "Ogenblikkelijke zonneproductie. Voegt per venster de zon- en netenergie toe, per afnemer en voor het huis. Injectie volgt uit een negatief netvermogen.",
           "window_average": "Lopend gemiddelde van de meter voor het huidige venster (bv. HomeWizard “gemiddeld verbruik”, DSMR 1.4.0). Het moet over het venster van de regio middelen (15 minuten in Vlaanderen) en bij elk vensterbegin terugvallen naar ongeveer 0; een gemiddelde over 5 minuten of een uur geeft een fout budget. Te verkiezen boven de afnameteller: exact, ook meteen na een herstart.",
           "grid_import_energy": "Afnameregister (1.8.x) als oplopende energieteller. Gebruikt als er geen venstergemiddelde gekozen is.",
+          "grid_export_energy": "Injectieregister (2.8.x) als oplopende energieteller. Geeft de exacte injectie per venster; zonder volgt injectie uit een negatief netvermogen.",
           "month_peak": "Hoogste venstergemiddelde deze maand; de target zakt nooit daaronder.",
           "meter_voltages": "Spanning per fase aan de meter, in volgorde L1, L2, L3. Gebruikt voor elke afnemer waarvan de eigen spanning ontbreekt; anders wordt 230 V aangenomen."
         }

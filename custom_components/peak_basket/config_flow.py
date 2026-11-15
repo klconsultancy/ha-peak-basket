@@ -28,6 +28,7 @@ from homeassistant.helpers.selector import (
 
 from .const import (
     CONF_EXTRA_A,
+    CONF_GRID_EXPORT_ENERGY,
     CONF_GRID_IMPORT_ENERGY,
     CONF_GRID_POWER,
     CONF_LOAD_POWER,
@@ -79,6 +80,7 @@ CONNECTION_SCHEMA = probatio.Schema(
         probatio.Optional(CONF_PV_POWER): _sensor("power"),
         probatio.Optional(CONF_WINDOW_AVERAGE): _sensor("power"),
         probatio.Optional(CONF_GRID_IMPORT_ENERGY): _sensor("energy"),
+        probatio.Optional(CONF_GRID_EXPORT_ENERGY): _sensor("energy"),
         probatio.Optional(CONF_MONTH_PEAK): _sensor("power"),
         probatio.Optional(CONF_METER_VOLTAGES): _sensor("voltage", multiple=True),
     }

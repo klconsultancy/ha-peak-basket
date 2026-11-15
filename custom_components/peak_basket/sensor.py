@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import suppress
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -14,10 +15,11 @@ from homeassistant.components.sensor import (
 from homeassistant.const import EntityCategory, UnitOfEnergy, UnitOfPower, UnitOfTime
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
+from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import CONF_PV_POWER, DOMAIN
-from .coordinator import Flows, PeakBasketConfigEntry, PeakBasketCoordinator, floor_power
+from .const import CONF_GRID_EXPORT_ENERGY, CONF_PV_POWER, DOMAIN
+from .coordinator import PeakBasketConfigEntry, PeakBasketCoordinator, floor_power
 from .model import Mode
 
 if TYPE_CHECKING:
@@ -37,6 +39,8 @@ class ConnectionSensorDescription(SensorEntityDescription):
     """A sensor of the grid connection and the coordinator value it shows."""
 
     value_fn: Callable[[PeakBasketCoordinator], float | None]
+    restore: bool = False
+    """Hand the last value back to the coordinator after a restart, within its window."""
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -45,6 +49,8 @@ class LoadSensorDescription(SensorEntityDescription):
 
     value_fn: Callable[[PeakBasketData, str], float | str | None]
     """From the latest evaluation and the load's subentry id."""
+    restore: bool = False
+    """Hand the last value back to the coordinator after a restart, within its window."""
 
 
 def _wh(value: float | None) -> float | None:
@@ -139,41 +145,55 @@ LOAD_SENSORS: tuple[LoadSensorDescription, ...] = (
 )
 
 
-def _flows(data: PeakBasketData) -> Flows:
-    return data.flows or Flows()
-
-
-CONNECTION_FLOW_SENSORS: tuple[ConnectionSensorDescription, ...] = tuple(
-    ConnectionSensorDescription(
+def _energy_sensor[D: (ConnectionSensorDescription, LoadSensorDescription)](
+    cls: type[D], key: str, value_fn: Callable[..., float | None], *, restore: bool = False
+) -> D:
+    return cls(
         key=key,
         translation_key=key,
         native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=0,
-        value_fn=fn,
+        value_fn=value_fn,
+        restore=restore,
     )
-    for key, fn in (
-        ("solar", lambda c: _wh(_flows(c.data).solar)),
-        ("export", lambda c: _wh(_flows(c.data).export)),
-        ("house_solar", lambda c: _wh(_flows(c.data).house_solar)),
-        ("house_grid", lambda c: _wh(_flows(c.data).house_grid)),
-    )
+
+
+# Who drew from the basket this window. Sums the coordinator adds up itself are restored
+# after a restart; the rest it derives.
+HOUSE_GRID = _energy_sensor(
+    ConnectionSensorDescription, "house_grid", lambda c: _wh(c.data.flows.house_grid)
+)
+LOAD_GRID = _energy_sensor(
+    LoadSensorDescription,
+    "load_grid",
+    lambda d, i: _wh(d.flows.load_grid.get(i, 0.0)),
+    restore=True,
+)
+SOLAR = (
+    _energy_sensor(
+        ConnectionSensorDescription, "solar", lambda c: _wh(c.data.flows.solar), restore=True
+    ),
+    _energy_sensor(
+        ConnectionSensorDescription, "house_solar", lambda c: _wh(c.data.flows.house_solar)
+    ),
+)
+LOAD_SOLAR = _energy_sensor(
+    LoadSensorDescription,
+    "load_solar",
+    lambda d, i: _wh(d.flows.load_solar.get(i, 0.0)),
+    restore=True,
 )
 
-LOAD_FLOW_SENSORS: tuple[LoadSensorDescription, ...] = tuple(
-    LoadSensorDescription(
-        key=key,
-        translation_key=key,
-        native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
-        state_class=SensorStateClass.MEASUREMENT,
-        suggested_display_precision=0,
-        value_fn=fn,
+
+def _export(*, from_register: bool) -> ConnectionSensorDescription:
+    """Export from the register is read again after a restart; from grid power, restored."""
+    return _energy_sensor(
+        ConnectionSensorDescription,
+        "export",
+        lambda c: _wh(c.data.flows.export),
+        restore=not from_register,
     )
-    for key, fn in (
-        ("load_solar", lambda d, i: _wh(_flows(d).load_solar.get(i, 0.0))),
-        ("load_grid", lambda d, i: _wh(_flows(d).load_grid.get(i, 0.0))),
-    )
-)
 
 
 async def async_setup_entry(
@@ -188,8 +208,14 @@ async def async_setup_entry(
         config_entry_id=entry.entry_id, **_connection_device(coordinator)
     )
     solar = CONF_PV_POWER in entry.data
-    connection_sensors = CONNECTION_SENSORS + (CONNECTION_FLOW_SENSORS if solar else ())
-    load_sensors = LOAD_SENSORS + (LOAD_FLOW_SENSORS if solar else ())
+    register = CONF_GRID_EXPORT_ENERGY in entry.data
+    connection_sensors = [*CONNECTION_SENSORS, HOUSE_GRID]
+    load_sensors = [*LOAD_SENSORS, LOAD_GRID]
+    if solar:
+        connection_sensors += SOLAR
+        load_sensors.append(LOAD_SOLAR)
+    if solar or register:
+        connection_sensors.append(_export(from_register=register))
     async_add_entities(ConnectionSensor(coordinator, d) for d in connection_sensors)
     for load in coordinator.loads:
         async_add_entities(
@@ -207,7 +233,7 @@ def _connection_device(coordinator: PeakBasketCoordinator) -> DeviceInfo:
     )
 
 
-class ConnectionSensor(CoordinatorEntity[PeakBasketCoordinator], SensorEntity):
+class ConnectionSensor(CoordinatorEntity[PeakBasketCoordinator], RestoreEntity, SensorEntity):
     """One value of the grid connection's basket."""
 
     _attr_has_entity_name = True
@@ -228,8 +254,14 @@ class ConnectionSensor(CoordinatorEntity[PeakBasketCoordinator], SensorEntity):
         """Return the value from the latest evaluation."""
         return self.entity_description.value_fn(self.coordinator)
 
+    async def async_added_to_hass(self) -> None:
+        """Hand a sum from before a restart back to the coordinator."""
+        await super().async_added_to_hass()
+        if self.entity_description.restore:
+            await _restore(self, None)
 
-class LoadSensor(CoordinatorEntity[PeakBasketCoordinator], SensorEntity):
+
+class LoadSensor(CoordinatorEntity[PeakBasketCoordinator], RestoreEntity, SensorEntity):
     """One value of a load's decision."""
 
     _attr_has_entity_name = True
@@ -259,3 +291,19 @@ class LoadSensor(CoordinatorEntity[PeakBasketCoordinator], SensorEntity):
     def native_value(self) -> float | str | None:
         """Return the value from the latest evaluation."""
         return self.entity_description.value_fn(self.coordinator.data, self._subentry_id)
+
+    async def async_added_to_hass(self) -> None:
+        """Hand a sum from before a restart back to the coordinator."""
+        await super().async_added_to_hass()
+        if self.entity_description.restore:
+            await _restore(self, self._subentry_id)
+
+
+async def _restore(sensor: ConnectionSensor | LoadSensor, subentry_id: str | None) -> None:
+    last = await sensor.async_get_last_state()
+    if last is None:
+        return
+    with suppress(ValueError):
+        sensor.coordinator.restore(
+            sensor.entity_description.key, subentry_id, float(last.state), last.last_updated
+        )

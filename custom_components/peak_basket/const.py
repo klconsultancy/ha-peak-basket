@@ -15,6 +15,7 @@ CONF_GRID_POWER = "grid_power"
 CONF_PV_POWER = "pv_power"
 CONF_WINDOW_AVERAGE = "window_average"
 CONF_GRID_IMPORT_ENERGY = "grid_import_energy"
+CONF_GRID_EXPORT_ENERGY = "grid_export_energy"
 CONF_MONTH_PEAK = "month_peak"
 CONF_METER_VOLTAGES = "meter_voltages"
 
