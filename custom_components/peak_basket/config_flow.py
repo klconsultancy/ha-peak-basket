@@ -42,6 +42,7 @@ from .const import (
     CONF_PEAK_GOAL,
     CONF_PRIORITY,
     CONF_PROFILE,
+    CONF_PV_POWER,
     CONF_REACTION,
     CONF_WINDOW_AVERAGE,
     DEFAULT_ENTRY_OPTIONS,
@@ -75,6 +76,7 @@ CONNECTION_SCHEMA = probatio.Schema(
             SelectSelectorConfig(options=list(PROFILES), translation_key=CONF_PROFILE)
         ),
         probatio.Required(CONF_GRID_POWER): _sensor("power"),
+        probatio.Optional(CONF_PV_POWER): _sensor("power"),
         probatio.Optional(CONF_WINDOW_AVERAGE): _sensor("power"),
         probatio.Optional(CONF_GRID_IMPORT_ENERGY): _sensor("energy"),
         probatio.Optional(CONF_MONTH_PEAK): _sensor("power"),

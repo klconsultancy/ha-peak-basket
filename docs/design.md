@@ -50,6 +50,13 @@ order, and the rest to the house (`model/solar.py`). Then the house carries most
 grid import, and you see how much the flexible loads leaned on the basket. Physically, and
 for the grid operator, it makes no difference.
 
+With a PV power source, the coordinator splits every interval between two evaluations this
+way and adds it up per window (Wh): solar, export, house from solar, house from grid, and
+per load from solar and from grid. Export comes from a negative grid power. An interval
+counts at the powers reported at its start, and only when they were all known and it is
+no longer than the maximum source age, so a gap or a sleeping inverter adds nothing. After
+a restart the window counts from that moment.
+
 ## Rules
 
 1. **Every controllable load goes through the basket**, a home battery that charges too.

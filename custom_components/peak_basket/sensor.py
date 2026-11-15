@@ -16,8 +16,8 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
-from .coordinator import PeakBasketConfigEntry, PeakBasketCoordinator, floor_power
+from .const import CONF_PV_POWER, DOMAIN
+from .coordinator import Flows, PeakBasketConfigEntry, PeakBasketCoordinator, floor_power
 from .model import Mode
 
 if TYPE_CHECKING:
@@ -26,8 +26,7 @@ if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
     from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-    from .coordinator import Load
-    from .model import ModelResult
+    from .coordinator import Load, PeakBasketData
 
 # Sensors only compute; the coordinator serialises the work.
 PARALLEL_UPDATES = 0
@@ -44,7 +43,8 @@ class ConnectionSensorDescription(SensorEntityDescription):
 class LoadSensorDescription(SensorEntityDescription):
     """A sensor of a load and the value of the load's evaluation it shows."""
 
-    value_fn: Callable[[ModelResult], float | str | None]
+    value_fn: Callable[[PeakBasketData, str], float | str | None]
+    """From the latest evaluation and the load's subentry id."""
 
 
 def _wh(value: float | None) -> float | None:
@@ -103,7 +103,7 @@ LOAD_SENSORS: tuple[LoadSensorDescription, ...] = (
         device_class=SensorDeviceClass.POWER,
         native_unit_of_measurement=UnitOfPower.WATT,
         state_class=SensorStateClass.MEASUREMENT,
-        value_fn=lambda r: _w(r.allowed_load_w),
+        value_fn=lambda d, i: _w(d.loads[i].allowed_load_w),
     ),
     LoadSensorDescription(
         key="grid_limit",
@@ -111,14 +111,14 @@ LOAD_SENSORS: tuple[LoadSensorDescription, ...] = (
         device_class=SensorDeviceClass.POWER,
         native_unit_of_measurement=UnitOfPower.WATT,
         state_class=SensorStateClass.MEASUREMENT,
-        value_fn=lambda r: _w(r.limit_w),
+        value_fn=lambda d, i: _w(d.loads[i].limit_w),
     ),
     LoadSensorDescription(
         key="mode",
         translation_key="mode",
         device_class=SensorDeviceClass.ENUM,
         options=[m.value for m in Mode],
-        value_fn=lambda r: r.mode.value,
+        value_fn=lambda d, i: d.loads[i].mode.value,
     ),
     LoadSensorDescription(
         key="charge_minutes",
@@ -126,7 +126,7 @@ LOAD_SENSORS: tuple[LoadSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfTime.MINUTES,
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=0,
-        value_fn=lambda r: round(r.charge_minutes),
+        value_fn=lambda d, i: round(d.loads[i].charge_minutes),
     ),
     LoadSensorDescription(
         key="load_room",
@@ -134,8 +134,45 @@ LOAD_SENSORS: tuple[LoadSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=0,
-        value_fn=lambda r: _wh(r.load_room_wh),
+        value_fn=lambda d, i: _wh(d.loads[i].load_room_wh),
     ),
+)
+
+
+def _flows(data: PeakBasketData) -> Flows:
+    return data.flows or Flows()
+
+
+CONNECTION_FLOW_SENSORS: tuple[ConnectionSensorDescription, ...] = tuple(
+    ConnectionSensorDescription(
+        key=key,
+        translation_key=key,
+        native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=0,
+        value_fn=fn,
+    )
+    for key, fn in (
+        ("solar", lambda c: _wh(_flows(c.data).solar)),
+        ("export", lambda c: _wh(_flows(c.data).export)),
+        ("house_solar", lambda c: _wh(_flows(c.data).house_solar)),
+        ("house_grid", lambda c: _wh(_flows(c.data).house_grid)),
+    )
+)
+
+LOAD_FLOW_SENSORS: tuple[LoadSensorDescription, ...] = tuple(
+    LoadSensorDescription(
+        key=key,
+        translation_key=key,
+        native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=0,
+        value_fn=fn,
+    )
+    for key, fn in (
+        ("load_solar", lambda d, i: _wh(_flows(d).load_solar.get(i, 0.0))),
+        ("load_grid", lambda d, i: _wh(_flows(d).load_grid.get(i, 0.0))),
+    )
 )
 
 
@@ -150,10 +187,13 @@ async def async_setup_entry(
     connection = dr.async_get(hass).async_get_or_create(
         config_entry_id=entry.entry_id, **_connection_device(coordinator)
     )
-    async_add_entities(ConnectionSensor(coordinator, d) for d in CONNECTION_SENSORS)
+    solar = CONF_PV_POWER in entry.data
+    connection_sensors = CONNECTION_SENSORS + (CONNECTION_FLOW_SENSORS if solar else ())
+    load_sensors = LOAD_SENSORS + (LOAD_FLOW_SENSORS if solar else ())
+    async_add_entities(ConnectionSensor(coordinator, d) for d in connection_sensors)
     for load in coordinator.loads:
         async_add_entities(
-            (LoadSensor(coordinator, load, d, connection.id) for d in LOAD_SENSORS),
+            (LoadSensor(coordinator, load, d, connection.id) for d in load_sensors),
             config_subentry_id=load.subentry_id,
         )
 
@@ -218,4 +258,4 @@ class LoadSensor(CoordinatorEntity[PeakBasketCoordinator], SensorEntity):
     @property
     def native_value(self) -> float | str | None:
         """Return the value from the latest evaluation."""
-        return self.entity_description.value_fn(self.coordinator.data.loads[self._subentry_id])
+        return self.entity_description.value_fn(self.coordinator.data, self._subentry_id)

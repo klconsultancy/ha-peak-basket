@@ -8,6 +8,7 @@
           "name": "Naam",
           "profile": "Tariefregio",
           "grid_power": "Netvermogen",
+          "pv_power": "PV-vermogen (optioneel)",
           "window_average": "Venstergemiddelde vermogen (aanbevolen)",
           "grid_import_energy": "Energie afname net",
           "month_peak": "Maandpiek (optioneel)",
@@ -15,6 +16,7 @@
         },
         "data_description": {
           "grid_power": "Ogenblikkelijk netvermogen, afname positief (bv. P1-meter). Injectie mag negatief zijn.",
+          "pv_power": "Ogenblikkelijke zonneproductie. Voegt per venster de zon- en netenergie toe, per afnemer en voor het huis. Injectie volgt uit een negatief netvermogen.",
           "window_average": "Lopend gemiddelde van de meter voor het huidige venster (bv. HomeWizard “gemiddeld verbruik”, DSMR 1.4.0). Te verkiezen boven de afnameteller: exact, ook meteen na een herstart.",
           "grid_import_energy": "Afnameregister (1.8.x) als oplopende energieteller. Gebruikt als er geen venstergemiddelde gekozen is.",
           "month_peak": "Hoogste venstergemiddelde deze maand; de target zakt nooit daaronder.",
@@ -179,6 +181,24 @@
       },
       "margin": {
         "name": "Marge"
+      },
+      "solar": {
+        "name": "Zon"
+      },
+      "export": {
+        "name": "Injectie"
+      },
+      "house_solar": {
+        "name": "Huis uit zon"
+      },
+      "house_grid": {
+        "name": "Huis uit net"
+      },
+      "load_solar": {
+        "name": "Uit zon"
+      },
+      "load_grid": {
+        "name": "Uit net"
       }
     }
   }

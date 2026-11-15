@@ -65,6 +65,7 @@ On the grid connection's device:
 |---|---|
 | **Target**, **House power** | The peak steered to, and the house load without any load |
 | **Basket**, **Used**, **Remaining**, **House reserve**, **Margin** | The window's energy budget (Wh) |
+| **Solar**, **Export**, **House from solar**, **House from grid** | With a PV source: the window's energy so far (Wh) |
 
 On each load's device:
 
@@ -75,6 +76,10 @@ On each load's device:
 | **Mode** | Continuous, pulse on, pulse off, or fallback |
 | **Run minutes left** | How long the load can still run in this window |
 | **Headroom** | The energy left for this load in this window (Wh) |
+| **From solar**, **From grid** | With a PV source: what this load drew this window (Wh) |
+
+Solar counts for the loads first, in priority order, and the rest for the house: so you see
+how much the flexible loads leaned on the grid.
 
 Names come in English and Dutch.
 

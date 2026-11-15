@@ -43,7 +43,15 @@ LOAD_FIELDS = {
     "min_charge_s",
     "extra_a",
 }
-LOAD_KEYS = {"allowed_power", "grid_limit", "mode", "charge_minutes", "load_room"}
+LOAD_KEYS = {
+    "allowed_power",
+    "grid_limit",
+    "mode",
+    "charge_minutes",
+    "load_room",
+    "load_solar",
+    "load_grid",
+}
 LOAD_NAME = "EV charger"
 
 
