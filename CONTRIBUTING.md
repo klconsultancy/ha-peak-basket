@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for your interest. This is a Home Assistant helper integration that budgets the grid
+Thanks for your interest. This is a Home Assistant integration that budgets the grid
 import per capacity-tariff window.
 
 ## Before you write code

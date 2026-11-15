@@ -1,6 +1,6 @@
 # Peak Basket for Home Assistant
 
-A Home Assistant helper that keeps your grid import within a **capacity-tariff** budget per
+A Home Assistant integration that keeps your grid import within a **capacity-tariff** budget per
 metering window, and tells a controllable load, such as an EV charger, how much power it may
 draw right now.
 
