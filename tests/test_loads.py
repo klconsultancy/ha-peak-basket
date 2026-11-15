@@ -91,16 +91,16 @@ async def test_priority_decides_who_yields(
     assert boiler_limit - boiler_allowed == pytest.approx(1000, abs=10)
 
 
-async def test_unknown_load_power_makes_the_other_loads_fall_back(
+async def test_an_unknown_lower_priority_load_does_not_stop_a_higher_one(
     hass: HomeAssistant, freezer: FrozenDateTimeFactory
 ) -> None:
     entry, ev, boiler = await _two_loads(hass, freezer, boiler_priority=2)
     hass.states.async_set(BOILER, "unavailable")
     await tick(hass)
-    # The EV cannot tell the boiler's share from the house's: safe fallback for both.
-    assert _load_value(hass, entry, ev, "mode") == "fallback"
-    assert _load_value(hass, entry, boiler, "mode") == "fallback"
-    assert value(hass, "house_power") == "unknown"
+    # The boiler counts as 0 W: its 2000 W on the grid count as house, on the safe side.
+    assert _load_value(hass, entry, ev, "mode") != "fallback"
+    assert _load_value(hass, entry, boiler, "mode") != "fallback"
+    assert float(value(hass, "house_power")) == 3000
 
 
 async def test_each_load_has_its_own_device(

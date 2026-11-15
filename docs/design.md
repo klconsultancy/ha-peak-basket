@@ -118,13 +118,21 @@ when Home Assistant is away. Push adapters (a mapping from the advice to a `numb
   window's length, so a sensor over another period gives a wrong budget without a
   warning. It is exact, also right after a restart. The meter resets it a second or two after the
   boundary; a value reported before the window started still belongs to the previous
-  window and counts as nothing used yet. Otherwise the coordinator takes the import
+  window and counts as nothing used yet. A reading with a fresh timestamp can still carry
+  the previous window (a reader that polls just before the meter resets), so the used
+  energy is also capped at what any connection can import since the boundary: the seconds
+  into the window times 69 kW (3 x 230 V x 100 A). Otherwise the coordinator takes the import
   register's difference since the window start. Its start value is the last fresh reading
   before the boundary; that may count a few seconds of the previous window, which errs on
   the safe side. After a restart mid-window, it reads the register at the window start from
   the recorder; without it, the window falls back.
 - **Staleness.** A source older than the configured maximum age counts as unavailable. The
   monthly peak is exempt: it changes rarely.
+- **A load's power** that is unavailable or older than the maximum age counts as 0 W, not
+  as a reason to fall back. Many sources only write a change, so a load at rest goes stale,
+  and waiting for a fresh value would lock it out: it would never start, so it would never
+  report. 0 W is the safe side: the load's share counts as house, which leaves the load,
+  and every other load, less room. Only the grid power and the used energy must be fresh.
 - **Phase voltages.** Per phase, the load's voltage, then the meter's, then 230 V. A
   voltage of 180 V or less counts as missing. They set the load's minimum (6 A) and maximum
   (16 A) power.
@@ -135,9 +143,8 @@ Loads go in priority order, lower first. For a load, the house is the grid impor
 its own power and the power of the loads after it: the loads before it count as house,
 the loads after it yield. So the first load gets the whole basket after the house, and a
 later load gets what the earlier ones leave unused right now. When an earlier load starts
-drawing more, a later one's allowed power drops on the next evaluation. When the power of
-any load is unknown, every load falls back, because no load can tell the house from the
-others.
+drawing more, a later one's allowed power drops on the next evaluation. A load whose power
+is unknown counts as 0 W, see below.
 
 The connection's own figures (house power, used, remaining, house reserve) take every
 load out of the house.

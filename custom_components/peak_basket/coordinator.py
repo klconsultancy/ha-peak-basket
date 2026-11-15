@@ -71,6 +71,8 @@ if TYPE_CHECKING:
 type PeakBasketConfigEntry = ConfigEntry[PeakBasketCoordinator]
 
 SECONDS_PER_HOUR = 3600
+# A generous physical bound on any grid connection's import: 3 x 230 V x 100 A.
+MAX_GRID_POWER_W = 3 * 230 * 100
 POWER_STEP_W = 10
 
 
@@ -243,24 +245,33 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
         """
         now = dt_util.now()
         start = window_start(now, self.profile.window_s)
+        seconds = (now - start).total_seconds()
         used_wh = self._used_wh(start, now)
+        cap_wh = seconds * MAX_GRID_POWER_W / SECONDS_PER_HOUR
+        if used_wh is not None and used_wh > cap_wh:
+            # More than any grid connection can import since the boundary: a reading that
+            # still carries the previous window, whatever its timestamp says.
+            LOGGER.debug("Used energy %.0f Wh capped to %.0f Wh", used_wh, cap_wh)
+            used_wh = cap_wh
 
         month_peak = None
         if peak_entity := self._src.get(CONF_MONTH_PEAK):
             month_peak = self._power_w(str(peak_entity), now, check_age=False)
         self.target_w = compute_target(self.profile, self.peak_goal_w, month_peak)
 
-        seconds = (now - start).total_seconds()
         grid = self._power_w(self._entity(CONF_GRID_POWER), now)
         meter = [self._number(e, now) for e in self._entities(CONF_METER_VOLTAGES)]
-        powers = [self._power_w(load.power_entity, now) for load in self.loads]
+        # A load's power that is missing or too old counts as 0 W. Many sources only write
+        # a change, so a load at rest goes stale; waiting for it would lock the load out.
+        # 0 W is the safe side: its share counts as house, which leaves less room.
+        powers = [self._power_w(load.power_entity, now) or 0.0 for load in self.loads]
 
         connection = evaluate(
             ModelInput(
                 target_w=self.target_w,
                 seconds_in_window=seconds,
                 grid_import_w=grid,
-                load_w=_sum(powers),
+                load_w=sum(powers),
                 window_import_wh=used_wh,
                 voltages=meter or None,
             ),
@@ -283,7 +294,7 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
                     load_w=powers[k],
                     window_import_wh=used_wh,
                     voltages=voltages or None,
-                    other_loads_w=_sum(powers[k + 1 :]),
+                    other_loads_w=sum(powers[k + 1 :]),
                 ),
                 self.profile,
                 load.params,
@@ -493,9 +504,3 @@ def _load(subentry_id: str, title: str, data: Mapping[str, Any], margin_w: float
             max_a=float(cfg[CONF_MAX_A]),
         ),
     )
-
-
-def _sum(powers: list[float | None]) -> float | None:
-    """Return the total, or None when one of them is unknown."""
-    known = [p for p in powers if p is not None]
-    return sum(known) if len(known) == len(powers) else None
