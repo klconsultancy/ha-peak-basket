@@ -31,7 +31,9 @@ The design, the model and the rules are in [docs/design.md](docs/design.md).
 - Home Assistant 2026.10 or later
 - A sensor for the grid power (import positive), for example from a P1 meter
 - The meter's running window average (DSMR 1.4.0, "average demand" on HomeWizard), or an
-  import energy counter
+  import energy counter. The average must cover the region's window (15 minutes in
+  Flanders) and drop back to about 0 at every window start: a 5-minute or an hourly
+  average gives a wrong budget, without a warning.
 - A sensor for the load's power
 
 ## Installation
@@ -81,12 +83,16 @@ On each load's device:
 Solar counts for the loads first, in priority order, and the rest for the house: so you see
 how much the flexible loads leaned on the grid.
 
-Names come in English and Dutch.
+Names come in English and Dutch. The **entity IDs** follow the language Home Assistant has
+when the sensors are created: the grid limit is `sensor.ev_charger_grid_limit` on an
+English system and `sensor.ev_charger_netlimiet` on a Dutch one, for a load named "EV
+charger". Look a sensor up by its name, and copy its entity ID from **Settings → Entities**
+before you put it in EVCC, Node-RED or an automation.
 
 ### Using it with EVCC
 
 Give the charger's circuit a dynamic limit read from the charger load's **Grid limit**
-sensor, and use the loadpoint's fast mode so the circuit is the only brake. EVCC keeps its static limit when
+sensor (its entity ID depends on the language, see above), and use the loadpoint's fast mode so the circuit is the only brake. EVCC keeps its static limit when
 Home Assistant is unreachable.
 
 ## Reporting a problem
