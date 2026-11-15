@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from functools import partial
 from typing import TYPE_CHECKING, Any, cast
@@ -27,6 +27,7 @@ from homeassistant.util.unit_conversion import EnergyConverter, PowerConverter
 
 from .const import (
     CONF_EXTRA_A,
+    CONF_GRID_EXPORT_ENERGY,
     CONF_GRID_IMPORT_ENERGY,
     CONF_GRID_POWER,
     CONF_LOAD_POWER,
@@ -95,6 +96,25 @@ class Load:
 
 
 @dataclass(frozen=True)
+class Flows:
+    """Energy this window so far (Wh).
+
+    The loads' grid and solar energy add up between evaluations. The house is the rest:
+    the import the meter counted minus what the loads drew from the grid, so the two
+    always add up to the import. Solar goes to the loads first, in priority order, then
+    the house. A display convention: physically, and for the grid operator, it makes no
+    difference.
+    """
+
+    solar: float = 0.0
+    export: float = 0.0
+    house_solar: float = 0.0
+    house_grid: float | None = None
+    load_solar: dict[str, float] = field(default_factory=dict)
+    load_grid: dict[str, float] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
 class PeakBasketData:
     """One evaluation: the grid connection's basket, and the decision for each load."""
 
@@ -102,23 +122,43 @@ class PeakBasketData:
     """The basket with every load taken out of the house; its mode and limits mean nothing."""
     loads: dict[str, ModelResult]
     """By subentry id."""
-    flows: Flows | None = None
-    """The window's solar and grid energy so far; None without a PV source."""
+    flows: Flows = field(default_factory=Flows)
+    """Who drew from the basket this window."""
 
 
-@dataclass(frozen=True)
-class Flows:
-    """Energy this window (Wh): solar to the loads first, in priority order, then the house.
+@dataclass
+class _Counter:
+    """An energy register read per window: import or export."""
 
-    A display convention: physically, and for the grid operator, it makes no difference.
-    """
+    name: str
+    window: datetime
+    start_wh: float | None = None
+    last: tuple[float, datetime] | None = None
 
-    solar: float = 0.0
-    export: float = 0.0
-    house_solar: float = 0.0
-    house_grid: float = 0.0
-    load_solar: dict[str, float] = field(default_factory=dict)
-    load_grid: dict[str, float] = field(default_factory=dict)
+    def since_start(
+        self, start: datetime, now: datetime, reading: float | None, max_age: timedelta
+    ) -> float | None:
+        """Return the energy counted since the window start, None when unknown.
+
+        At a new window the start value is the last fresh reading before the boundary:
+        it may count a few seconds of the previous window, which errs on the safe side.
+        Without one, the first reading after it.
+        """
+        if start != self.window:
+            self.window = start
+            self.start_wh = reading
+            if self.last is not None and start - self.last[1] <= max_age:
+                self.start_wh = self.last[0]
+        if reading is not None:
+            self.last = (reading, now)
+        if reading is None or self.start_wh is None:
+            return None
+        counted = reading - self.start_wh
+        if counted < 0:
+            LOGGER.warning("The %s counter went backwards: fallback for this window", self.name)
+            self.start_wh = None
+            return None
+        return counted
 
 
 class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
@@ -144,21 +184,27 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
         self.peak_goal_w = opts[CONF_PEAK_GOAL]
         self.target_w = self.peak_goal_w
         self._max_age = timedelta(seconds=opts[CONF_MAX_AGE])
-        self._window_start = window_start(dt_util.now(), self.profile.window_s)
-        self._counter_start_wh: float | None = None
-        self._last_counter: tuple[float, datetime] | None = None
+        window = window_start(dt_util.now(), self.profile.window_s)
+        self._import = _Counter("import", window)
+        self._export = _Counter("export", window)
         self._published_at = dt_util.now()
-        self._flows = Flows()
-        self._flows_window = self._window_start
+        # Energy added up per window: "solar", "export", "load_solar:<id>", "load_grid:<id>".
+        self._sums: dict[str, float] = {}
+        self._sums_window = window
         self._last_powers: tuple[datetime, list[float | None]] | None = None
         self._unsubs: list[CALLBACK_TYPE] = []
 
     async def async_start(self) -> None:
         """Restore the running window, subscribe to the grid power and evaluate once."""
-        self._window_start = window_start(dt_util.now(), self.profile.window_s)
+        window = window_start(dt_util.now(), self.profile.window_s)
+        self._import.window = self._export.window = self._sums_window = window
+        if export := self._src.get(CONF_GRID_EXPORT_ENERGY):
+            self._export.start_wh = await self._async_counter_at(str(export), window)
         if not self._src.get(CONF_WINDOW_AVERAGE):
-            self._counter_start_wh = await self._async_counter_at(self._window_start)
-            if self._counter_start_wh is None:
+            self._import.start_wh = await self._async_counter_at(
+                self._entity(CONF_GRID_IMPORT_ENERGY), window
+            )
+            if self._import.start_wh is None:
                 LOGGER.info("No import counter value at the window start: fallback until the next")
         self._unsubs.append(
             async_track_state_change_event(
@@ -243,11 +289,17 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
                 load.params,
             )
 
-        flows = None
+        pv: float | None = 0.0
         if pv_entity := self._src.get(CONF_PV_POWER):
             pv = self._power_w(str(pv_entity), now)
-            flows = self._integrate(start, now, [grid, pv, *powers])
-        data = PeakBasketData(connection=connection, loads=results, flows=flows)
+        self._integrate(start, now, [grid, pv, *powers])
+        exported = None
+        if export_entity := self._src.get(CONF_GRID_EXPORT_ENERGY):
+            reading = self._energy_wh(str(export_entity), now)
+            exported = self._export.since_start(start, now, reading, self._max_age)
+        data = PeakBasketData(
+            connection=connection, loads=results, flows=self._snapshot(used_wh, exported)
+        )
         if force or self._must_publish(data, now):
             self._published_at = now
             self.async_set_updated_data(data)
@@ -265,48 +317,60 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
                 return True
         return False
 
-    def _integrate(self, start: datetime, now: datetime, powers: list[float | None]) -> Flows:
-        """Add the interval since the previous evaluation to the window's flows.
+    def _integrate(self, start: datetime, now: datetime, powers: list[float | None]) -> None:
+        """Add the interval since the previous evaluation to the window's sums.
 
-        ``powers`` is grid, PV, then each load in priority order. The interval counts at
-        the powers reported at its start, and only when they were all known and the
-        interval is no longer than the maximum source age: a gap is not filled in.
+        ``powers`` is grid, PV (0 without a PV source), then each load in priority order.
+        The interval counts at the powers reported at its start, and only when they were
+        all known and the interval is no longer than the maximum source age: a gap is not
+        filled in.
         """
-        if start != self._flows_window:
-            self._flows_window = start
-            self._flows = Flows()
+        if start != self._sums_window:
+            self._sums_window = start
+            self._sums = {}
         elif self._last_powers is not None:
             since, (grid, pv, *loads) = self._last_powers
-            hours = (now - since).total_seconds() / SECONDS_PER_HOUR
-            if (
-                grid is not None
-                and pv is not None
-                and None not in loads
-                and now - since <= self._max_age
-            ):
-                known = cast("list[float]", loads)
+            known = grid is not None and pv is not None and None not in loads
+            if known and now - since <= self._max_age:
+                hours = (now - since).total_seconds() / SECONDS_PER_HOUR
                 split = allocate_solar(
-                    solar=pv, export=max(-grid, 0.0), grid_import=grid, loads=known
+                    solar=cast("float", pv),
+                    export=max(-cast("float", grid), 0.0),
+                    grid_import=cast("float", grid),
+                    loads=cast("list[float]", loads),
                 )
-                ids = [load.subentry_id for load in self.loads]
-                f = self._flows
-                self._flows = replace(
-                    f,
-                    solar=f.solar + max(pv, 0.0) * hours,
-                    export=f.export + split.export * hours,
-                    house_solar=f.house_solar + split.house_solar * hours,
-                    house_grid=f.house_grid + split.house_grid * hours,
-                    load_solar={
-                        i: f.load_solar.get(i, 0.0) + s.solar * hours
-                        for i, s in zip(ids, split.loads, strict=True)
-                    },
-                    load_grid={
-                        i: f.load_grid.get(i, 0.0) + s.grid * hours
-                        for i, s in zip(ids, split.loads, strict=True)
-                    },
-                )
+                self._add("solar", max(cast("float", pv), 0.0) * hours)
+                self._add("export", split.export * hours)
+                for load, part in zip(self.loads, split.loads, strict=True):
+                    self._add(f"load_solar:{load.subentry_id}", part.solar * hours)
+                    self._add(f"load_grid:{load.subentry_id}", part.grid * hours)
         self._last_powers = (now, powers)
-        return self._flows
+
+    def _add(self, key: str, wh: float) -> None:
+        self._sums[key] = self._sums.get(key, 0.0) + wh
+
+    @callback
+    def restore(self, key: str, subentry_id: str | None, wh: float, at: datetime) -> None:
+        """Take back a sum a sensor had before a restart, when it is from this window."""
+        if window_start(at, self.profile.window_s) == self._sums_window:
+            self._add(f"{key}:{subentry_id}" if subentry_id else key, wh)
+
+    def _snapshot(self, used_wh: float | None, exported: float | None) -> Flows:
+        sums = self._sums
+        ids = [load.subentry_id for load in self.loads]
+        load_solar = {i: sums.get(f"load_solar:{i}", 0.0) for i in ids}
+        load_grid = {i: sums.get(f"load_grid:{i}", 0.0) for i in ids}
+        # The export register when there is one and it is known, else the grid power's.
+        export = exported if exported is not None else sums.get("export", 0.0)
+        solar = sums.get("solar", 0.0)
+        return Flows(
+            solar=solar,
+            export=export,
+            house_solar=max(solar - export - sum(load_solar.values()), 0.0),
+            house_grid=None if used_wh is None else max(used_wh - sum(load_grid.values()), 0.0),
+            load_solar=load_solar,
+            load_grid=load_grid,
+        )
 
     def _used_wh(self, start: datetime, now: datetime) -> float | None:
         """Return the grid import since the window start.
@@ -324,25 +388,8 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
             avg = self._power_w(str(avg_entity), now)
             return None if avg is None else max(avg, 0.0) * self.profile.window_s / SECONDS_PER_HOUR
 
-        counter = self._energy_wh(self._entity(CONF_GRID_IMPORT_ENERGY), now)
-        if start != self._window_start:
-            # A new window: a full basket. The start value is the last fresh reading
-            # before the boundary: it may count a few seconds of the previous window as
-            # used, which errs on the safe side. Without one, the first reading after it.
-            self._window_start = start
-            self._counter_start_wh = counter
-            if self._last_counter is not None and start - self._last_counter[1] <= self._max_age:
-                self._counter_start_wh = self._last_counter[0]
-        if counter is not None:
-            self._last_counter = (counter, now)
-        if counter is None or self._counter_start_wh is None:
-            return None
-        used = counter - self._counter_start_wh
-        if used < 0:
-            LOGGER.warning("The import counter went backwards: fallback for this window")
-            self._counter_start_wh = None
-            return None
-        return used
+        reading = self._energy_wh(self._entity(CONF_GRID_IMPORT_ENERGY), now)
+        return self._import.since_start(start, now, reading, self._max_age)
 
     def _entity(self, key: str) -> str:
         return str(self._src[key])
@@ -390,9 +437,8 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
         value, unit = self._reading(entity_id, now)
         return None if value is None else _to_wh(value, unit, entity_id)
 
-    async def _async_counter_at(self, when: datetime) -> float | None:
-        """Read the import counter at ``when`` from the recorder, after a restart."""
-        entity_id = self._entity(CONF_GRID_IMPORT_ENERGY)
+    async def _async_counter_at(self, entity_id: str, when: datetime) -> float | None:
+        """Read an energy register at ``when`` from the recorder, after a restart."""
         current = self.hass.states.get(entity_id)
         unit = current.attributes.get(ATTR_UNIT_OF_MEASUREMENT) if current else None
         try:

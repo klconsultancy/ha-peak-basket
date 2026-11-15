@@ -67,7 +67,8 @@ On the grid connection's device:
 |---|---|
 | **Target**, **House power** | The peak steered to, and the house load without any load |
 | **Basket**, **Used**, **Remaining**, **House reserve**, **Margin** | The window's energy budget (Wh) |
-| **Solar**, **Export**, **House from solar**, **House from grid** | With a PV source: the window's energy so far (Wh) |
+| **House from grid** | The house's share of the window's import so far (Wh) |
+| **Solar**, **House from solar**, **Export** | With a PV source (export also with an export register): the window's energy so far (Wh) |
 
 On each load's device:
 
@@ -78,10 +79,67 @@ On each load's device:
 | **Mode** | Continuous, pulse on, pulse off, or fallback |
 | **Run minutes left** | How long the load can still run in this window |
 | **Headroom** | The energy left for this load in this window (Wh) |
-| **From solar**, **From grid** | With a PV source: what this load drew this window (Wh) |
+| **From grid** | What this load drew from the grid this window (Wh) |
+| **From solar** | With a PV source: what this load drew from solar this window (Wh) |
 
-Solar counts for the loads first, in priority order, and the rest for the house: so you see
-how much the flexible loads leaned on the grid.
+The **From grid** sensors exist without solar too. With a PV source come **From solar**,
+**Solar** and **House from solar**; with a PV source or an export register, **Export**.
+The house is the rest: **House from grid** plus every load's **From grid** is always the
+window's **Used**. Solar counts for the loads first, in priority order, then for the house.
+Every window starts from zero; the value just before the reset is the window's total.
+
+### A history of who drew from the basket
+
+Until Peak Basket has its own cards, [apexcharts-card](https://github.com/RomRider/apexcharts-card)
+can stack these sensors per window. Replace the entity IDs with yours (they depend on the
+language, see above):
+
+```yaml
+type: custom:apexcharts-card
+header:
+  show: true
+  title: Basket per quarter hour
+graph_span: 12h
+stacked: true
+apex_config:
+  chart:
+    stacked: true
+    stackOnlyBar: false
+  legend:
+    onItemClick:
+      toggleDataSeries: false
+  yaxis:
+    - decimalsInFloat: 0
+      title:
+        text: Wh
+series:
+  - entity: sensor.peak_basket_house_from_grid
+    name: House (grid)
+    type: column
+    extend_to: false
+    group_by: { duration: 15min, func: last, fill: zero }
+  - entity: sensor.ev_charger_from_grid
+    name: EV charger (grid)
+    type: column
+    extend_to: false
+    group_by: { duration: 15min, func: last, fill: zero }
+  - entity: sensor.ev_charger_from_solar
+    name: EV charger (solar)
+    type: column
+    extend_to: false
+    group_by: { duration: 15min, func: last, fill: zero }
+```
+
+What took trial and error with apexcharts-card 2.2.3:
+
+- Give no series a `yaxis_id`: series on named axes do not stack. Set the one axis in
+  `apex_config.yaxis`.
+- Set both `stacked: true` and `apex_config.chart.stacked: true`, with `stackOnlyBar:
+  false`, and only `column` series: no lines in the stack.
+- Use `extend_to: false` and `group_by: { duration: 15min, func: last, fill: zero }` on
+  every series, or the bars shift or turn thin.
+- Turn legend toggling off (`toggleDataSeries: false`): with stacked, nearly empty series,
+  hiding one hides other layers too.
 
 Names come in English and Dutch. The **entity IDs** follow the language Home Assistant has
 when the sensors are created: the grid limit is `sensor.ev_charger_grid_limit` on an

@@ -50,12 +50,28 @@ order, and the rest to the house (`model/solar.py`). Then the house carries most
 grid import, and you see how much the flexible loads leaned on the basket. Physically, and
 for the grid operator, it makes no difference.
 
-With a PV power source, the coordinator splits every interval between two evaluations this
-way and adds it up per window (Wh): solar, export, house from solar, house from grid, and
-per load from solar and from grid. Export comes from a negative grid power. An interval
-counts at the powers reported at its start, and only when they were all known and it is
-no longer than the maximum source age, so a gap or a sleeping inverter adds nothing. After
-a restart the window counts from that moment.
+### Who drew from the basket
+
+Per window the integration publishes what each load drew from the grid and, with a PV
+source, from solar, plus the house's share and the export (Wh). Between two evaluations
+the coordinator splits the interval with `allocate_solar` and adds the loads' shares up.
+An interval counts at the powers reported at its start, and only when they were all known
+and it is no longer than the maximum source age, so a gap or a sleeping inverter adds
+nothing.
+
+The house is the rest, not a sum of its own: **house from grid** is the import the meter
+counted (*Used*) minus what the loads drew from the grid, never below zero, so the two
+always add up to the import. **House from solar** is solar minus export minus what the
+loads took from solar.
+
+Export comes from the export register (2.8.x) when one is configured, counted from the
+last reading before the window like the import; else from a negative grid power. Solar
+sensors exist only with a PV source; the export sensor with a PV source or an export
+register.
+
+After a restart the sums the coordinator adds up itself (each load's grid and solar,
+solar, and export from grid power) come back from the sensors' last states when those
+are from the running window. The rest follows from the meter.
 
 ## Rules
 
