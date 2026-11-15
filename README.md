@@ -46,7 +46,25 @@ the export counter.
 
 ## Installation
 
-Peak Basket installs through [HACS](https://hacs.xyz/) as a custom repository:
+Peak Basket is a custom repository. From Home Assistant 2026.11 it installs through the
+built-in **Marketplace**; on 2026.10 through [HACS](https://hacs.xyz/). Both install the
+same release zip.
+
+### Marketplace (Home Assistant 2026.11 and later)
+
+1. Go to **Settings → Marketplace** and select **Add from link** in the upper-right corner.
+2. Under **GitHub link**, enter `klconsultancy/ha-peak-basket` and select **Add**. The first
+   time, the Marketplace asks you to connect a GitHub account: select **Continue**, enter
+   the code it shows on GitHub, and approve.
+3. Select Peak Basket in the list, install it and restart Home Assistant.
+
+Release candidates are pre-releases, which the Marketplace does not offer by default. To
+get them: **Settings → Devices & services → Marketplace**, open Peak Basket's device page,
+enable the **Pre-release** entity (it is disabled by default) and turn it on.
+
+A HACS install moves to the Marketplace by itself on the first start of 2026.11.
+
+### HACS (Home Assistant 2026.10)
 
 1. In HACS, open the menu (⋮) → **Custom repositories**.
 2. Add `https://github.com/klconsultancy/ha-peak-basket` with the type **Integration**.
