@@ -253,14 +253,17 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
         seconds = (now - start).total_seconds()
         grid = self._power_w(self._entity(CONF_GRID_POWER), now)
         meter = [self._number(e, now) for e in self._entities(CONF_METER_VOLTAGES)]
-        powers = [self._power_w(load.power_entity, now) for load in self.loads]
+        # A load's power that is missing or too old counts as 0 W. Many sources only write
+        # a change, so a load at rest goes stale; waiting for it would lock the load out.
+        # 0 W is the safe side: its share counts as house, which leaves less room.
+        powers = [self._power_w(load.power_entity, now) or 0.0 for load in self.loads]
 
         connection = evaluate(
             ModelInput(
                 target_w=self.target_w,
                 seconds_in_window=seconds,
                 grid_import_w=grid,
-                load_w=_sum(powers),
+                load_w=sum(powers),
                 window_import_wh=used_wh,
                 voltages=meter or None,
             ),
@@ -283,7 +286,7 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
                     load_w=powers[k],
                     window_import_wh=used_wh,
                     voltages=voltages or None,
-                    other_loads_w=_sum(powers[k + 1 :]),
+                    other_loads_w=sum(powers[k + 1 :]),
                 ),
                 self.profile,
                 load.params,
@@ -493,9 +496,3 @@ def _load(subentry_id: str, title: str, data: Mapping[str, Any], margin_w: float
             max_a=float(cfg[CONF_MAX_A]),
         ),
     )
-
-
-def _sum(powers: list[float | None]) -> float | None:
-    """Return the total, or None when one of them is unknown."""
-    known = [p for p in powers if p is not None]
-    return sum(known) if len(known) == len(powers) else None
