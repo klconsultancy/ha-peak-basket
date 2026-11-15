@@ -89,7 +89,7 @@ class PeakBasketCoordinator(DataUpdateCoordinator[ModelResult]):
         self.peak_goal_w = opts[CONF_PEAK_GOAL]
         self.target_w = self.peak_goal_w
         self._max_age = timedelta(seconds=opts[CONF_MAX_AGE])
-        self._window_start = window_start(dt_util.utcnow(), self.profile.window_s)
+        self._window_start = window_start(dt_util.now(), self.profile.window_s)
         self._counter_start_wh: float | None = None
         self._last_counter: tuple[float, datetime] | None = None
         self._published_at: datetime | None = None
@@ -97,7 +97,7 @@ class PeakBasketCoordinator(DataUpdateCoordinator[ModelResult]):
 
     async def async_start(self) -> None:
         """Restore the running window, subscribe to the grid power and evaluate once."""
-        self._window_start = window_start(dt_util.utcnow(), self.profile.window_s)
+        self._window_start = window_start(dt_util.now(), self.profile.window_s)
         if not self._src.get(CONF_WINDOW_AVERAGE):
             self._counter_start_wh = await self._async_counter_at(self._window_start)
             if self._counter_start_wh is None:
@@ -134,7 +134,7 @@ class PeakBasketCoordinator(DataUpdateCoordinator[ModelResult]):
         Between ticks a result waits, unless the mode changes or the grid limit or the
         load's allowed power goes down: a consumer must learn that at once.
         """
-        now = dt_util.utcnow()
+        now = dt_util.now()
         start = window_start(now, self.profile.window_s)
         used_wh = self._used_wh(start, now)
 
@@ -185,6 +185,11 @@ class PeakBasketCoordinator(DataUpdateCoordinator[ModelResult]):
         restart. Otherwise: the difference of the import register since the window start.
         """
         if avg_entity := self._src.get(CONF_WINDOW_AVERAGE):
+            state = self._fresh_state(str(avg_entity), now)
+            if state is not None and state.last_reported < start:
+                # The meter resets its average a second or two after the boundary; until
+                # then it shows the previous window's. Next to nothing is used this early.
+                return 0.0
             avg = self._power_w(str(avg_entity), now)
             return None if avg is None else max(avg, 0.0) * self.profile.window_s / SECONDS_PER_HOUR
 

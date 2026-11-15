@@ -56,7 +56,8 @@ for the grid operator, it makes no difference.
 2. **Decide on measurements, never on status texts.** A load runs when its measured power
    is above 100 W, not when its status says "charging".
 3. **Tariff is not engine.** Region rules are data (profiles); the engine is generic.
-4. **Windows are clock blocks**, not a sliding average.
+4. **Windows are clock blocks** of the local clock (Home Assistant's time zone), not a sliding
+   average. The hour that repeats when daylight saving time ends has windows of its own.
 5. **Missing or stale data gives a safe, lower limit**, never "unlimited".
 6. **No API of its own, no required external system.** EVCC is one consumer, not a
    requirement.
@@ -84,7 +85,9 @@ when Home Assistant is away. Push adapters (a mapping from the advice to a `numb
   or MWh. Negative grid power (export) counts as zero import.
 - **Used energy in the window.** Preferred is the meter's running window average (DSMR
   1.4.0, "average demand" on HomeWizard), which is the energy so far divided by the window
-  length: exact, and right after a restart. Otherwise the coordinator takes the import
+  length: exact, and right after a restart. The meter resets it a second or two after the
+  boundary; a value reported before the window started still belongs to the previous
+  window and counts as nothing used yet. Otherwise the coordinator takes the import
   register's difference since the window start. Its start value is the last fresh reading
   before the boundary; that may count a few seconds of the previous window, which errs on
   the safe side. After a restart mid-window, it reads the register at the window start from
