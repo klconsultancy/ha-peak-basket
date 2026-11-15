@@ -332,5 +332,5 @@ async def test_previous_windows_average_counts_as_nothing_used(
     freezer.move_to("2026-11-15T03:15:02+00:00")
     hass.states.async_set(AVERAGE, "3", {"unit_of_measurement": "W"})
     await tick(hass)
-    assert float(value(hass, "used")) == pytest.approx(0.8, abs=0.1)
+    assert float(value(hass, "used")) == 1  # 0.75 Wh, published per Wh
     assert value(hass, "mode") == "continuous"
