@@ -91,8 +91,8 @@ Every window starts from zero; the value just before the reset is the window's t
 ### A history of who drew from the basket
 
 Until Peak Basket has its own cards, [apexcharts-card](https://github.com/RomRider/apexcharts-card)
-can stack these sensors per window. Replace the entity IDs with yours (they depend on the
-language, see above):
+can stack these sensors per window. Replace the loads' entity IDs with yours (they depend on the
+load's name and the language, see above):
 
 ```yaml
 type: custom:apexcharts-card
@@ -113,7 +113,7 @@ apex_config:
       title:
         text: Wh
 series:
-  - entity: sensor.peak_basket_house_from_grid
+  - entity: sensor.peak_basket_house_grid
     name: House (grid)
     type: column
     extend_to: false
@@ -141,11 +141,18 @@ What took trial and error with apexcharts-card 2.2.3:
 - Turn legend toggling off (`toggleDataSeries: false`): with stacked, nearly empty series,
   hiding one hides other layers too.
 
-Names come in English and Dutch. The **entity IDs** follow the language Home Assistant has
-when the sensors are created: the grid limit is `sensor.ev_charger_grid_limit` on an
-English system and `sensor.ev_charger_netlimiet` on a Dutch one, for a load named "EV
-charger". Look a sensor up by its name, and copy its entity ID from **Settings → Entities**
-before you put it in EVCC, Node-RED or an automation.
+Names come in English and Dutch. The connection's device is called **Grid connection**
+("Aansluiting" in Dutch), and its sensors get entity IDs that are the same in every
+language: `sensor.peak_basket_` followed by `target`, `house_power`, `basket`, `used`,
+`remaining`, `house_reserve`, `margin`, `house_grid`, `solar`, `house_solar` or `export`.
+
+A load's sensors follow the load's name and the language Home Assistant has when they are
+created: the grid limit is `sensor.ev_charger_grid_limit` on an English system and
+`sensor.ev_charger_netlimiet` on a Dutch one, for a load named "EV charger". Look a load's
+sensor up by its name, and copy its entity ID from **Settings → Entities** before you put
+it in EVCC, Node-RED or an automation.
+
+Installations from before 0.1.0-rc.3 keep the entity IDs they have.
 
 ### Using it with EVCC
 
