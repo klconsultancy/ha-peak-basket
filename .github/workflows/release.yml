@@ -21,6 +21,8 @@ jobs:
     name: Release PR
     if: github.ref_type == 'branch'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # the zip on the release
     steps:
       # A GitHub App token instead of GITHUB_TOKEN, so CI runs on the release PR.
       - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
@@ -30,8 +32,22 @@ jobs:
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
       # HACS installs from the GitHub Release that merging the release PR creates.
       - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        id: release
         with:
           token: ${{ steps.app-token.outputs.token }}
+      # HACS installs peak_basket.zip (hacs.json), with the version set to the tag's.
+      - if: steps.release.outputs.release_created
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.release.outputs.tag_name }}
+          persist-credentials: false
+      - if: steps.release.outputs.release_created
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.release.outputs.tag_name }}
+        run: |
+          python3 -m script.release_zip "$TAG" peak_basket.zip
+          gh release upload "$TAG" peak_basket.zip --repo "$GITHUB_REPOSITORY" --clobber
 
   release-candidate:
     name: Release candidate
@@ -40,12 +56,16 @@ jobs:
     permissions:
       contents: write # the pre-release
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.ref_name }}
         run: |
-          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "Release $TAG exists already."
-            exit 0
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --prerelease --generate-notes --title "$TAG"
           fi
-          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --prerelease --generate-notes --title "$TAG"
+          # HACS installs peak_basket.zip (hacs.json), with the version set to the tag's.
+          python3 -m script.release_zip "$TAG" peak_basket.zip
+          gh release upload "$TAG" peak_basket.zip --repo "$GITHUB_REPOSITORY" --clobber
