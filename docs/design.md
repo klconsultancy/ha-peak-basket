@@ -70,7 +70,7 @@ from other integrations, and everything it decides is published as entities.
 |---|---|
 | Input | Entity selectors: grid power, the window average or the import register, the load's power, optionally the monthly peak and phase voltages |
 | Output | Sensors: the allowed power of the load, the total grid limit, the mode, the basket fields |
-| Manifest | `iot_class: calculated`, `integration_type: helper`, no requirements, no credentials |
+| Manifest | `iot_class: calculated`, `integration_type: service` (an integration card with its own device), no requirements, no credentials |
 
 **Pull first.** The load's allowed power, and the total grid limit, are sensors that any
 system reads itself: EVCC (a circuit's dynamic limit from Home Assistant), Node-RED, an
