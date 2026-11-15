@@ -1,6 +1,6 @@
 # Agent instructions
 
-Home Assistant helper integration that budgets the grid import per capacity-tariff window
+Home Assistant integration that budgets the grid import per capacity-tariff window
 and publishes the power a controllable load may draw. Read [`docs/design.md`](docs/design.md)
 for the design and [`CONTEXT.md`](CONTEXT.md) for terms before changing code.
 
