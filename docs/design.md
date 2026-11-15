@@ -56,8 +56,9 @@ Per window the integration publishes what each load drew from the grid and, with
 source, from solar, plus the house's share and the export (Wh). Between two evaluations
 the coordinator splits the interval with `allocate_solar` and adds the loads' shares up.
 An interval counts at the powers reported at its start, and only when they were all known
-and it is no longer than the maximum source age, so a gap or a sleeping inverter adds
-nothing.
+and it is no longer than the maximum source age, so a gap adds nothing. A PV power that is
+missing or stale counts as 0 W, like a load's: an inverter that sleeps at night reports
+unavailable, and the loads' grid energy must still count.
 
 The house is the rest, not a sum of its own: **house from grid** is the import the meter
 counted (*Used*) minus what the loads drew from the grid, never below zero, so the two
