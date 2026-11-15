@@ -265,3 +265,36 @@ async def test_an_interval_across_the_boundary_counts_its_part_in_the_new_window
     await _at(hass, freezer, "2026-11-15T12:15:34+00:00", grid=-500, ev=2000, pv=3000)
     assert float(value(hass, "solar")) == 28  # 28.3 Wh
     assert float(value(hass, "load_solar")) == 19  # 18.9 Wh
+
+
+async def test_a_sleeping_inverter_does_not_stop_the_loads_grid_energy(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    """At night the inverter reports unavailable: the car's charging is still counted."""
+    await _at(hass, freezer, "2026-11-15T03:15:01+00:00", grid=8000, ev=7000, pv="unavailable")
+    await setup_entry(hass, _sources(pv_power=PV))
+    # 36 s = 0.01 h: the EV drew 70 Wh, the meter counted 80 Wh (320 W over 900 s).
+    await _at(
+        hass,
+        freezer,
+        "2026-11-15T03:15:37+00:00",
+        grid=8000,
+        ev=7000,
+        pv="unavailable",
+        average=320,
+    )
+    assert float(value(hass, "load_grid")) == 70
+    assert float(value(hass, "house_grid")) == 10
+    assert float(value(hass, "solar")) == 0
+
+
+async def test_a_stale_pv_power_counts_as_zero(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    freezer.move_to("2026-11-15T03:13:00+00:00")
+    hass.states.async_set(PV, "1500", {"unit_of_measurement": "W"})  # two minutes old soon
+    await _at(hass, freezer, "2026-11-15T03:15:01+00:00", grid=8000, ev=7000)
+    await setup_entry(hass, _sources(pv_power=PV))
+    await _at(hass, freezer, "2026-11-15T03:15:37+00:00", grid=8000, ev=7000, average=320)
+    assert float(value(hass, "load_grid")) == 70
+    assert float(value(hass, "solar")) == 0
