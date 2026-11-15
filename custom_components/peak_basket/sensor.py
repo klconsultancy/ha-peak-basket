@@ -228,7 +228,7 @@ def _connection_device(coordinator: PeakBasketCoordinator) -> DeviceInfo:
     entry = coordinator.config_entry
     return DeviceInfo(
         identifiers={(DOMAIN, entry.entry_id)},
-        name=entry.title,
+        translation_key="connection",
         entry_type=DeviceEntryType.SERVICE,
     )
 
@@ -248,6 +248,8 @@ class ConnectionSensor(CoordinatorEntity[PeakBasketCoordinator], RestoreEntity, 
         entry = coordinator.config_entry
         self._attr_unique_id = f"{entry.entry_id}_{description.key}"
         self._attr_device_info = _connection_device(coordinator)
+        # The device's name is translated: keep new entity IDs the same in every language.
+        self.entity_id = f"sensor.{DOMAIN}_{description.key}"
 
     @property
     def native_value(self) -> float | None:

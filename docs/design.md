@@ -97,6 +97,11 @@ from other integrations, and everything it decides is published as entities.
 | Output | The connection's device: target, house power and the basket fields. Each load's device: its allowed power, grid limit, mode, run minutes and headroom |
 | Manifest | `iot_class: calculated`, `integration_type: service` (an integration card with its own device), no requirements, no credentials |
 
+The connection's device is named by translation ("Grid connection", "Aansluiting"), not
+after the entry: Home Assistant lists it under "Devices that don't belong to a sub-entry",
+next to one device per load. Its sensors set their entity IDs to `sensor.peak_basket_<key>`,
+so they are the same in every language; a load's sensors follow the load's name.
+
 **Pull first.** The load's allowed power, and the total grid limit, are sensors that any
 system reads itself: EVCC (a circuit's dynamic limit from Home Assistant), Node-RED, an
 automation, ESPHome. The executing system keeps its own safety logic and its own fallback
