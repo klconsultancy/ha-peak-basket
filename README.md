@@ -75,7 +75,7 @@ On each load's device:
 | Sensor | Meaning |
 |---|---|
 | **Allowed power** | The power the load may draw now (W): the one to steer on |
-| **Grid limit** | The total import allowed now with this load included, for a circuit limit |
+| **Grid limit** | The total import allowed now: house, this load, and the loads after it, which yield. For a circuit limit |
 | **Mode** | Continuous, pulse on, pulse off, or fallback |
 | **Run minutes left** | How long the load can still run in this window |
 | **Headroom** | The energy left for this load in this window (Wh) |
