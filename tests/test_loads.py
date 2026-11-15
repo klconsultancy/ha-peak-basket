@@ -78,17 +78,22 @@ async def test_a_lower_priority_load_yields_to_a_higher_one(
     ev_limit = float(_load_value(hass, entry, ev, "grid_limit"))
     boiler_limit = float(_load_value(hass, entry, boiler, "grid_limit"))
     assert ev_allowed > boiler_allowed
-    assert ev_limit - ev_allowed == pytest.approx(1000, abs=10)
+    # The grid limit is the whole grid's: the house, this load, and the loads that yield.
+    assert ev_limit - ev_allowed == pytest.approx(1000 + 2000, abs=10)
     assert boiler_limit - boiler_allowed == pytest.approx(1000 + 4140, abs=10)
 
 
 async def test_priority_decides_who_yields(
     hass: HomeAssistant, freezer: FrozenDateTimeFactory
 ) -> None:
-    entry, _, boiler = await _two_loads(hass, freezer, boiler_priority=0)
+    entry, ev, boiler = await _two_loads(hass, freezer, boiler_priority=0)
     boiler_limit = float(_load_value(hass, entry, boiler, "grid_limit"))
     boiler_allowed = float(_load_value(hass, entry, boiler, "allowed_power"))
-    assert boiler_limit - boiler_allowed == pytest.approx(1000, abs=10)
+    ev_limit = float(_load_value(hass, entry, ev, "grid_limit"))
+    ev_allowed = float(_load_value(hass, entry, ev, "allowed_power"))
+    # Now the boiler goes first and the EV yields: the EV sees the boiler as house.
+    assert boiler_limit - boiler_allowed == pytest.approx(1000 + 4140, abs=10)
+    assert ev_limit - ev_allowed == pytest.approx(1000 + 2000, abs=10)
 
 
 async def test_an_unknown_lower_priority_load_does_not_stop_a_higher_one(
@@ -291,3 +296,36 @@ async def test_migrated_load_is_named_in_the_system_language(hass: HomeAssistant
     await hass.async_block_till_done()
     (load,) = entry.subentries.values()
     assert load.title == "Afnemer"
+
+
+async def test_a_starting_load_keeps_its_room_from_the_loads_after_it(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    """Both loads idle: the EV may start, so the boiler must not count on the same room."""
+    freezer.move_to("2026-11-15T03:14:59+00:00")
+    set_sources(hass, 1000, 100.0, 0)
+    hass.states.async_set(BOILER, "0", {"unit_of_measurement": "W"})
+    entry = await setup_entry(hass)
+    boiler = await _add_boiler(hass, entry, 2)
+    (ev,) = (s.subentry_id for s in entry.subentries.values() if s.title != "Boiler")
+    freezer.move_to("2026-11-15T03:15:01+00:00")
+    set_sources(hass, 1000, 100.0, 0)
+    hass.states.async_set(BOILER, "0", {"unit_of_measurement": "W"})
+    await tick(hass)
+    ev_allowed = float(_load_value(hass, entry, ev, "allowed_power"))
+    boiler_limit = float(_load_value(hass, entry, boiler, "grid_limit"))
+    boiler_allowed = float(_load_value(hass, entry, boiler, "allowed_power"))
+    assert _load_value(hass, entry, ev, "mode") in {"continuous", "pulse_on"}
+    assert ev_allowed > 0
+    # The boiler counts the EV's claim as house.
+    assert boiler_limit - boiler_allowed == pytest.approx(1000 + ev_allowed, abs=20)
+
+
+async def test_a_running_load_claims_only_what_it_draws(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    """Once the EV draws, the grid measures it: no claim on top."""
+    entry, _, boiler = await _two_loads(hass, freezer, boiler_priority=2)
+    boiler_limit = float(_load_value(hass, entry, boiler, "grid_limit"))
+    boiler_allowed = float(_load_value(hass, entry, boiler, "allowed_power"))
+    assert boiler_limit - boiler_allowed == pytest.approx(1000 + 4140, abs=10)
