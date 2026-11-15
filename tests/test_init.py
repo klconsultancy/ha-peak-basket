@@ -349,3 +349,26 @@ async def test_previous_windows_average_counts_as_nothing_used(
     await tick(hass)
     assert float(value(hass, "used")) == 1  # 0.75 Wh, published per Wh
     assert value(hass, "mode") == "continuous"
+
+
+async def test_an_old_average_reported_after_the_boundary_is_capped(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    """A reader can poll the meter just after the boundary, before the meter resets.
+
+    Its reading then carries the previous window's average with a fresh timestamp. No
+    grid connection imports 1325 Wh in a second: the used energy is capped.
+    """
+    freezer.move_to("2026-11-15T03:14:57+00:00")
+    hass.states.async_set(GRID, "5170", {"unit_of_measurement": "W"})
+    hass.states.async_set(EV, "4070", {"unit_of_measurement": "W"})
+    hass.states.async_set(AVERAGE, "5300", {"unit_of_measurement": "W"})
+    sources: dict[str, Any] = {**SOURCES, "window_average": AVERAGE}
+    del sources["grid_import_energy"]
+    await setup_entry(hass, sources)
+
+    freezer.move_to("2026-11-15T03:15:00.500+00:00")
+    hass.states.async_set(AVERAGE, "5301", {"unit_of_measurement": "W"})
+    await tick(hass)
+    assert float(value(hass, "used")) <= 10  # 0.5 s x 69 kW
+    assert value(hass, "mode") == "continuous"

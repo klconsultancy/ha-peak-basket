@@ -71,6 +71,8 @@ if TYPE_CHECKING:
 type PeakBasketConfigEntry = ConfigEntry[PeakBasketCoordinator]
 
 SECONDS_PER_HOUR = 3600
+# A generous physical bound on any grid connection's import: 3 x 230 V x 100 A.
+MAX_GRID_POWER_W = 3 * 230 * 100
 POWER_STEP_W = 10
 
 
@@ -243,14 +245,20 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
         """
         now = dt_util.now()
         start = window_start(now, self.profile.window_s)
+        seconds = (now - start).total_seconds()
         used_wh = self._used_wh(start, now)
+        cap_wh = seconds * MAX_GRID_POWER_W / SECONDS_PER_HOUR
+        if used_wh is not None and used_wh > cap_wh:
+            # More than any grid connection can import since the boundary: a reading that
+            # still carries the previous window, whatever its timestamp says.
+            LOGGER.debug("Used energy %.0f Wh capped to %.0f Wh", used_wh, cap_wh)
+            used_wh = cap_wh
 
         month_peak = None
         if peak_entity := self._src.get(CONF_MONTH_PEAK):
             month_peak = self._power_w(str(peak_entity), now, check_age=False)
         self.target_w = compute_target(self.profile, self.peak_goal_w, month_peak)
 
-        seconds = (now - start).total_seconds()
         grid = self._power_w(self._entity(CONF_GRID_POWER), now)
         meter = [self._number(e, now) for e in self._entities(CONF_METER_VOLTAGES)]
         # A load's power that is missing or too old counts as 0 W. Many sources only write
