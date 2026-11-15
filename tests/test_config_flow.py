@@ -136,3 +136,11 @@ async def test_reconfigure_a_load(hass: HomeAssistant) -> None:
     load = entry.subentries[load.subentry_id]
     assert load.title == "Car"
     assert load.data["reaction_s"] == 30.0
+
+
+def test_demand_comes_right_after_priority() -> None:
+    """It only means something together with the priority, so it sits next to it."""
+    from custom_components.peak_basket.config_flow import LOAD_SCHEMA  # noqa: PLC0415
+
+    keys = [str(key) for key in LOAD_SCHEMA.schema]
+    assert keys.index("demand") == keys.index("priority") + 1
