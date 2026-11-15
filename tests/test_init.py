@@ -61,7 +61,7 @@ async def test_next_window_starts_from_the_last_reading_before_it(
     await hass.async_block_till_done()
     assert value(hass, "mode") == "pulse_on"
     assert float(value(hass, "house_power")) == 1650
-    assert float(value(hass, "allowed_load_power")) == pytest.approx(4340)
+    assert float(value(hass, "allowed_power")) == pytest.approx(4340)
     assert float(value(hass, "used")) == 0
 
     # 1.2 kWh imported 10 min in: the house reserve takes the rest, so the load stops.
@@ -70,7 +70,7 @@ async def test_next_window_starts_from_the_last_reading_before_it(
     await tick(hass)
     assert float(value(hass, "used")) == pytest.approx(1200)
     assert value(hass, "mode") == "pulse_off"
-    assert float(value(hass, "allowed_load_power")) == 0
+    assert float(value(hass, "allowed_power")) == 0
     assert float(value(hass, "charge_minutes")) == 0
 
 
@@ -94,7 +94,7 @@ async def test_stale_sources_fall_back(hass: HomeAssistant, freezer: FrozenDateT
     freezer.move_to(START + timedelta(minutes=10, seconds=5))
     await tick(hass)
     assert value(hass, "mode") == "fallback"
-    assert float(value(hass, "allowed_load_power")) == 0
+    assert float(value(hass, "allowed_power")) == 0
     assert value(hass, "house_power") == "unknown"
 
 
@@ -171,7 +171,7 @@ async def test_window_average_source_and_voltage_chain(
         "window_average": AVERAGE,
         "load_power": EV,
         "voltages": [f"sensor.charger_l{phase}" for phase in (1, 2, 3)],
-        "voltages_fallback": ["sensor.meter_l1", "sensor.meter_l2"],
+        "meter_voltages": ["sensor.meter_l1", "sensor.meter_l2"],
     }
     entry = await setup_entry(hass, sources)
 
@@ -179,7 +179,7 @@ async def test_window_average_source_and_voltage_chain(
     assert float(value(hass, "used")) == 83  # 83.3 Wh, published per Wh
     # (5400 W x 900 s - 300000 J) over the 600 s left.
     assert float(value(hass, "grid_limit")) == pytest.approx(7600, abs=1)
-    assert entry.runtime_data.data.p_load_min_w == pytest.approx(6 * 696)
+    assert next(iter(entry.runtime_data.data.loads.values())).p_load_min_w == pytest.approx(6 * 696)
 
     hass.states.async_set(AVERAGE, "unavailable")
     await tick(hass)
@@ -282,11 +282,11 @@ async def test_a_lower_allowed_power_is_published_at_once(
     hass: HomeAssistant, freezer: FrozenDateTimeFactory
 ) -> None:
     await _continuous_entry(hass, freezer)
-    allowed = float(value(hass, "allowed_load_power"))
+    allowed = float(value(hass, "allowed_power"))
     freezer.move_to("2026-11-15T03:15:02+00:00")
     hass.states.async_set(GRID, "3000", {"unit_of_measurement": "W"})
     await hass.async_block_till_done()
-    assert float(value(hass, "allowed_load_power")) < allowed
+    assert float(value(hass, "allowed_power")) < allowed
 
 
 async def test_house_reserve_and_margin_are_diagnostic(
@@ -326,7 +326,7 @@ async def test_previous_windows_average_counts_as_nothing_used(
     await tick(hass)  # a higher limit waits for the tick
     assert float(value(hass, "used")) == 0
     assert value(hass, "mode") == "continuous"
-    assert float(value(hass, "allowed_load_power")) > 4000
+    assert float(value(hass, "allowed_power")) > 4000
 
     # The reset arrives.
     freezer.move_to("2026-11-15T03:15:02+00:00")

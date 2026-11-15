@@ -11,7 +11,7 @@ allows its minimum power, or in bursts at minimum power when it doesn't. A fixed
 leaves that budget unused, or stops the load when it would have fit.
 
 > **Status:** early development. The first region is Belgium – Flanders (15-minute windows,
-> monthly peak, 2.5 kW minimum). One controllable load per entry.
+> monthly peak, 2.5 kW minimum).
 
 ## How it works
 
@@ -45,29 +45,43 @@ The integration installs through [HACS](https://hacs.xyz/) as a custom repositor
 ## Configuration
 
 1. Go to **Settings → Devices & services → Add integration** and pick **Peak Basket**.
-2. Pick the region and the sensors. Prefer the window average over the import counter: it
-   is exact, also right after a restart. The phase voltages are optional; per phase the
-   load's voltage is used, else the meter's, else 230 V.
-3. Under **Configure**, set the peak goal (the window average you allow, 5500 W by
-   default) and, if needed, the margin, reaction time and minimum run time.
+2. Describe the **grid connection**: the region and the meter's sensors. Prefer the window
+   average over the import counter: it is exact, also right after a restart. The meter's
+   phase voltages are optional.
+3. Describe the **first load**, such as the EV charger: its power sensor and, optionally,
+   its phase voltages (per phase the load's voltage is used, else the meter's, else
+   230 V), its current range, reaction time and minimum run time.
+4. Add more loads with **Add load** on the Peak Basket card. Each has a **priority**
+   (lower goes first): a load gets what the loads before it leave unused, and the loads
+   after it yield to it. **Reconfigure** on a load changes it.
+5. Under **Configure**, set the peak goal (the window average you allow, 5500 W by
+   default) and, if needed, the margin.
 
 ## What you get
 
+On the grid connection's device:
+
 | Sensor | Meaning |
 |---|---|
-| **Allowed load power** | The power the load may draw now (W): the one to steer on |
-| **Grid limit** | The total import allowed now, house and load together, for a circuit limit |
+| **Target**, **House power** | The peak steered to, and the house load without any load |
+| **Basket**, **Used**, **Remaining**, **House reserve**, **Margin** | The window's energy budget (Wh) |
+
+On each load's device:
+
+| Sensor | Meaning |
+|---|---|
+| **Allowed power** | The power the load may draw now (W): the one to steer on |
+| **Grid limit** | The total import allowed now with this load included, for a circuit limit |
 | **Mode** | Continuous, pulse on, pulse off, or fallback |
 | **Run minutes left** | How long the load can still run in this window |
-| **Target**, **House power** | The peak steered to, and the estimated house load |
-| **Basket**, **Used**, **Remaining**, **House reserve**, **Load headroom**, **Margin** | The window's energy budget (Wh) |
+| **Headroom** | The energy left for this load in this window (Wh) |
 
 Names come in English and Dutch.
 
 ### Using it with EVCC
 
-Give the charger's circuit a dynamic limit read from the **Grid limit** sensor, and use the
-loadpoint's fast mode so the circuit is the only brake. EVCC keeps its static limit when
+Give the charger's circuit a dynamic limit read from the charger load's **Grid limit**
+sensor, and use the loadpoint's fast mode so the circuit is the only brake. EVCC keeps its static limit when
 Home Assistant is unreachable.
 
 ## Reporting a problem

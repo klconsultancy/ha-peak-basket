@@ -294,3 +294,34 @@ class TestVoltages:
         assert phase_voltage_sum([240]) == pytest.approx(240 + 230 + 230)
         assert phase_voltage_sum(None) == pytest.approx(690)
         assert phase_voltage_sum([180, 181, None]) == pytest.approx(230 + 181 + 230)
+
+
+class TestOtherLoads:
+    def test_lower_priority_loads_do_not_count_as_house(self) -> None:
+        res = evaluate(
+            ModelInput(
+                target_w=TARGET,
+                seconds_in_window=0,
+                grid_import_w=7140,
+                load_w=4140,
+                window_import_wh=0,
+                other_loads_w=2000,
+            ),
+            BE_FLANDERS,
+        )
+        assert res.house_w == 1000
+
+    def test_unknown_other_loads_fall_back(self) -> None:
+        res = evaluate(
+            ModelInput(
+                target_w=TARGET,
+                seconds_in_window=0,
+                grid_import_w=7140,
+                load_w=4140,
+                window_import_wh=0,
+                other_loads_w=None,
+            ),
+            BE_FLANDERS,
+        )
+        assert res.mode is Mode.FALLBACK
+        assert res.allowed_load_w == 0
