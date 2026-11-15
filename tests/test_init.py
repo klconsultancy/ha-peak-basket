@@ -235,3 +235,36 @@ async def test_unload_stops_the_coordinator(
     assert await hass.config_entries.async_unload(entry.entry_id)
     assert entry.state is ConfigEntryState.NOT_LOADED
     assert not coordinator._unsubs  # noqa: SLF001
+
+
+async def test_previous_windows_average_counts_as_nothing_used(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    """The meter resets its average a second or two after the boundary.
+
+    Until then it still shows the previous window's average: that must not count as
+    energy already used in the new window.
+    """
+    freezer.move_to("2026-11-15T03:14:57+00:00")
+    hass.states.async_set(GRID, "5170", {"unit_of_measurement": "W"})
+    hass.states.async_set(EV, "4070", {"unit_of_measurement": "W"})
+    hass.states.async_set(AVERAGE, "5300", {"unit_of_measurement": "W"})
+    sources: dict[str, Any] = {**SOURCES, "window_average": AVERAGE}
+    del sources["grid_import_energy"]
+    await setup_entry(hass, sources)
+    assert float(value(hass, "used")) == pytest.approx(1325)
+
+    # New window, the average not yet reset: a grid update lands first.
+    freezer.move_to("2026-11-15T03:15:01+00:00")
+    hass.states.async_set(GRID, "5171", {"unit_of_measurement": "W"})
+    await hass.async_block_till_done()
+    assert float(value(hass, "used")) == 0
+    assert value(hass, "mode") == "continuous"
+    assert float(value(hass, "allowed_load_power")) > 4000
+
+    # The reset arrives.
+    freezer.move_to("2026-11-15T03:15:02+00:00")
+    hass.states.async_set(AVERAGE, "3", {"unit_of_measurement": "W"})
+    await tick(hass)
+    assert float(value(hass, "used")) == pytest.approx(0.8, abs=0.1)
+    assert value(hass, "mode") == "continuous"

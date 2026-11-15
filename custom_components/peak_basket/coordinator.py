@@ -156,6 +156,11 @@ class PeakBasketCoordinator(DataUpdateCoordinator[ModelResult]):
         restart. Otherwise: the difference of the import register since the window start.
         """
         if avg_entity := self._src.get(CONF_WINDOW_AVERAGE):
+            state = self._fresh_state(str(avg_entity), now)
+            if state is not None and state.last_reported < start:
+                # The meter resets its average a second or two after the boundary; until
+                # then it shows the previous window's. Next to nothing is used this early.
+                return 0.0
             avg = self._power_w(str(avg_entity), now)
             return None if avg is None else max(avg, 0.0) * self.profile.window_s / SECONDS_PER_HOUR
 
