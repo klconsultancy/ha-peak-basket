@@ -350,27 +350,11 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
             self.async_set_updated_data(data)
 
     def _claims(self, load: Load, start: datetime, now: datetime) -> bool:
-        """Whether an idle load that may start keeps its room from the loads after it.
-
-        With a demand entity: while it is not off. Without one, a load that does not
-        start is not told apart from one that cannot (a car not plugged in), so the claim
-        lasts the load's reaction time, then lapses until the load draws or a new window
-        starts.
-        """
+        """Whether an idle load that may start keeps its room from the loads after it."""
         if load.demand_entity:
             state = self.hass.states.get(load.demand_entity)
             return state is None or state.state != STATE_OFF
-        if start != self._claim_window:
-            self._claim_window = start
-            self._claim_started.clear()
-            self._claim_lapsed.clear()
-        if load.subentry_id in self._claim_lapsed:
-            return False
-        since = self._claim_started.setdefault(load.subentry_id, now)
-        if now - since <= timedelta(seconds=load.params.reaction_s):
-            return True
-        self._claim_lapsed.add(load.subentry_id)
-        return False
+        return True
 
     def _meter_pending(self, now: datetime) -> bool:
         """Whether the meter has not reported since start-up, for less than the maximum age."""
