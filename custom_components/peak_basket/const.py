@@ -51,3 +51,6 @@ DEFAULT_LOAD: dict[str, float] = {
 }
 
 TICK_SECONDS = 5
+# A window average that drops this close to the boundary is the meter starting the next
+# window: its clock runs a few seconds ahead of Home Assistant's.
+ROLLOVER_SECONDS = 15
