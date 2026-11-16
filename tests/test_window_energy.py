@@ -337,7 +337,7 @@ async def test_a_meter_ahead_keeps_the_windows_totals_up_to_the_boundary(
     caplog.set_level(logging.DEBUG, "custom_components.peak_basket")
     await _at(hass, freezer, "2026-11-15T07:59:58+00:00", grid=1900, ev=0, average=2)
     assert float(value(hass, "used")) == 475
-    # The seconds left show how far the meter's clock runs ahead.
+    # The meter's clock runs at least the seconds left ahead.
     assert "Window average dropped 2 s before the boundary" in caplog.text
     assert float(value(hass, "house_grid")) == 475
 
