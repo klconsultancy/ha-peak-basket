@@ -486,6 +486,11 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
             ):
                 # The window's import only grows: the meter, its clock a few seconds
                 # ahead, has started the next window. Keep this one's until the boundary.
+                LOGGER.debug(
+                    "Window average dropped %.0f s before the boundary: meter ahead, kept %.0f Wh",
+                    left,
+                    last[1],
+                )
                 return last[1]
             self._average_used = (start, used)
             return used

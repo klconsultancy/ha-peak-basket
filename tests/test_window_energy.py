@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -15,6 +16,7 @@ from custom_components.peak_basket.const import DOMAIN
 from .conftest import EV, GRID, SOURCES, setup_entry, tick, value
 
 if TYPE_CHECKING:
+    import pytest
     from freezegun.api import FrozenDateTimeFactory
     from homeassistant.core import HomeAssistant
 
@@ -319,7 +321,7 @@ async def test_implausible_export_counter_falls_back_to_grid_power(
 
 
 async def test_a_meter_ahead_keeps_the_windows_totals_up_to_the_boundary(
-    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory, caplog: pytest.LogCaptureFixture
 ) -> None:
     """The meter's clock runs a few seconds ahead: its average resets before the boundary.
 
@@ -332,8 +334,11 @@ async def test_a_meter_ahead_keeps_the_windows_totals_up_to_the_boundary(
     assert float(value(hass, "used")) == 475  # 1900 W over 900 s
     assert float(value(hass, "house_grid")) == 475
 
+    caplog.set_level(logging.DEBUG, "custom_components.peak_basket")
     await _at(hass, freezer, "2026-11-15T07:59:58+00:00", grid=1900, ev=0, average=2)
     assert float(value(hass, "used")) == 475
+    # The meter's clock runs at least the seconds left ahead.
+    assert "Window average dropped 2 s before the boundary" in caplog.text
     assert float(value(hass, "house_grid")) == 475
 
     await _at(hass, freezer, "2026-11-15T08:00:03+00:00", grid=1900, ev=0, average=40)

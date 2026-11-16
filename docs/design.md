@@ -132,7 +132,9 @@ when Home Assistant is away. Push adapters (a mapping from the advice to a `numb
   ahead resets it before Home Assistant's boundary instead. The meter is what gets billed,
   and within a window the average only grows, so a drop in the last 15 seconds is the meter
   starting the next window: the window keeps its last import until the boundary, so its
-  totals and the last seconds' decision stay this window's. An earlier drop is taken as it
+  totals and the last seconds' decision stay this window's. A debug log gives the seconds
+  left at the first evaluation after the drop: the meter's clock runs at least that far
+  ahead. An earlier drop is taken as it
   is. Otherwise the coordinator takes the import
   register's difference since the window start. Its start value is the last fresh reading
   before the boundary; that may count a few seconds of the previous window, which errs on
