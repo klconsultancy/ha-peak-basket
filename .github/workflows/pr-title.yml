@@ -1,9 +1,10 @@
 name: PR title
 
 # The title becomes the squash commit on main, from which release-please derives the next
-# version and the changelog. It runs on pull_request, not pull_request_target: it only
-# reads the title, which a read-only token can, and GitHub blocks pull_request_target by
-# default in public repositories.
+# version and the changelog. The organization's reusable check runs on pull_request, not
+# pull_request_target: it only reads the title, which a read-only token can, and GitHub
+# blocks pull_request_target by default in public repositories. The required status check
+# is "PR title / Conventional commit title".
 on:
   pull_request:
     types: [opened, edited, synchronize, reopened]
@@ -11,17 +12,11 @@ on:
   # The title was checked on the pull request; the group has none to check.
   merge_group:
 
-permissions:
-  pull-requests: read
+permissions: {}
 
 jobs:
-  conventional-commit:
-    name: Conventional commit title
-    runs-on: ubuntu-latest
-    steps:
-      - if: github.event_name == 'pull_request'
-        uses: amannn/action-semantic-pull-request@2252a14e810aa9b85c2d560bd7070c802206ecf6 # v6.1.2
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-      - if: github.event_name == 'merge_group'
-        run: echo "Checked on the pull request."
+  title:
+    name: PR title
+    permissions:
+      pull-requests: read
+    uses: klconsultancy/workflows/.github/workflows/pr-title.yml@78f13c92a7d630ff602a5497ed6bbe6e68e2dd0e # main
