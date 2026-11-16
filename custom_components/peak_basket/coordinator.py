@@ -205,6 +205,7 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
         self._sums_window = window
         self._last_powers: tuple[datetime, list[float | None]] | None = None
         self._unsubs: list[CALLBACK_TYPE] = []
+        self._started_at = dt_util.now()
 
     async def async_start(self) -> None:
         """Restore the running window, subscribe to the grid power and evaluate once."""
@@ -226,6 +227,7 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
         self._unsubs.append(
             async_track_time_interval(self.hass, self._on_tick, timedelta(seconds=TICK_SECONDS))
         )
+        self._started_at = dt_util.now()
         self._evaluate()
 
     @callback
@@ -340,7 +342,7 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
         data = PeakBasketData(
             connection=connection, loads=results, flows=self._snapshot(used_wh, exported)
         )
-        if force or self._must_publish(data, now):
+        if self._must_publish(data, now, force=force):
             self._published_at = now
             self.async_set_updated_data(data)
 
@@ -367,7 +369,25 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
         self._claim_lapsed.add(load.subentry_id)
         return False
 
-    def _must_publish(self, data: PeakBasketData, now: datetime) -> bool:
+    def _meter_pending(self, now: datetime) -> bool:
+        """Whether the meter has not reported since start-up, for less than the maximum age."""
+        if now - self._started_at >= self._max_age:
+            return False
+        energy = self._src.get(CONF_WINDOW_AVERAGE) or self._src[CONF_GRID_IMPORT_ENERGY]
+        return any(
+            self._fresh_state(entity_id, now) is None
+            for entity_id in (self._entity(CONF_GRID_POWER), str(energy))
+        )
+
+    def _must_publish(self, data: PeakBasketData, now: datetime, *, force: bool) -> bool:
+        if self.data is None:
+            # Right after a restart the meter's integration may not have written a state
+            # yet. Its fallback would publish 0 W allowed power, which stops a load that
+            # was running: stay unavailable, so a consumer keeps its own safe default,
+            # until the meter reports or has been missing for the maximum age.
+            return not self._meter_pending(now)
+        if force:
+            return True
         if now - self._published_at >= timedelta(seconds=TICK_SECONDS):
             return True
         for subentry_id, result in data.loads.items():

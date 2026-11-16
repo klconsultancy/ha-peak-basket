@@ -424,3 +424,51 @@ async def test_an_old_average_reported_after_the_boundary_is_capped(
     await tick(hass)
     assert float(value(hass, "used")) <= 10  # 0.5 s x 69 kW
     assert value(hass, "mode") == "continuous"
+
+
+def _average_sources() -> dict[str, Any]:
+    sources = {**SOURCES, "window_average": AVERAGE}
+    del sources["grid_import_energy"]
+    return sources
+
+
+async def _start_before_the_meter(hass: HomeAssistant, freezer: FrozenDateTimeFactory) -> None:
+    """Start right after a restart: everything is there but the grid power."""
+    freezer.move_to(START)
+    hass.states.async_set(AVERAGE, "400", {"unit_of_measurement": "W"})
+    hass.states.async_set(EV, "0", {"unit_of_measurement": "W"})
+    await setup_entry(hass, _average_sources())
+
+
+async def test_start_before_the_meter_reports_is_unavailable_not_0_w(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    await _start_before_the_meter(hass, freezer)
+    assert value(hass, "allowed_power") == "unavailable"
+    assert value(hass, "mode") == "unavailable"
+    assert value(hass, "grid_limit") == "unavailable"
+
+
+async def test_the_meter_s_first_state_is_published_at_once(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    await _start_before_the_meter(hass, freezer)
+    freezer.move_to(START + timedelta(milliseconds=70))
+    hass.states.async_set(AVERAGE, "400", {"unit_of_measurement": "W"}, force_update=True)
+    hass.states.async_set(GRID, "1000", {"unit_of_measurement": "W"})
+    await hass.async_block_till_done()
+    assert value(hass, "mode") == "continuous"
+    assert float(value(hass, "allowed_power")) > 0
+
+
+async def test_a_meter_still_missing_after_the_maximum_age_gives_the_fallback(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    await _start_before_the_meter(hass, freezer)
+    freezer.move_to(START + timedelta(seconds=55))
+    await tick(hass)
+    assert value(hass, "mode") == "unavailable"
+    freezer.move_to(START + timedelta(seconds=61))
+    await tick(hass)
+    assert value(hass, "mode") == "fallback"
+    assert float(value(hass, "grid_limit")) == 5400
