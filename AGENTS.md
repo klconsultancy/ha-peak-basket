@@ -15,6 +15,9 @@ for the design and [`CONTEXT.md`](CONTEXT.md) for terms before changing code.
 - Leave a pull request open for review: Claude reviews every one
   (`.github/workflows/claude-review.yml`, from `klconsultancy/workflows`) and a person
   merges it. Answer the review's comments before asking for the merge.
+- `main` has a merge queue: a pull request is merged with **Merge when ready**, and the
+  queue brings it up to date with `main` and runs the required checks again, one after the
+  other. A workflow that gives a required check must also run on `merge_group`.
 - PR titles and squash commits follow Conventional Commits (`feat:`, `fix:`, `docs:`,
   `test:`, `refactor:`, `build:`, `ci:`, `chore:`). They drive release-please.
 - A release candidate is a tag `vX.Y.Z-rc.N` on `main`, pushed by an admin; the release
