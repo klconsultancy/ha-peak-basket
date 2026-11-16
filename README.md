@@ -178,21 +178,22 @@ Solar counts for the loads first, in priority order, then for the house.
 ### EVCC
 
 Give the root circuit a dynamic limit read from the charger load's **Grid limit**, keep a
-static `maxPower` as the fallback, and charge in **fast** mode, so the circuit is the only
-brake:
+static fallback, and charge in **fast** mode, so the circuit is the only brake. Set both
+fallbacks to your peak goal:
 
 ```yaml
 circuits:
   - name: main
     title: Grid connection
-    maxPower: 5500 # used when Home Assistant cannot be reached
+    maxPower: 5500 # peak goal; used when Home Assistant cannot be reached
     meter: grid # the limit then applies to the whole import
     GetMaxPower:
       source: http
       uri: http://homeassistant.local:8123/api/states/sensor.ev_charger_grid_limit
       headers:
         - Authorization: Bearer <long-lived access token>
-      jq: .state | tonumber
+      # peak goal; used while the sensor is unavailable or unknown
+      jq: (.state | tonumber?) // 5500
       cache: 30s
 
 loadpoints:
@@ -267,7 +268,7 @@ What took trial and error with apexcharts-card 2.2.3:
 | You see | Check |
 |---|---|
 | **Mode** is **Safe mode** | The grid power and the window average (or import counter) must be available and younger than the maximum age of a reading. Some sources only report a change: raise the maximum age, or pick a sensor that reports regularly. |
-| The sensors are **unavailable** for a few seconds after a restart | That is on purpose: the meter has not reported yet, and its fallback would tell the load 0 W. Your consumer keeps its own default (EVCC its static `maxPower`). After the maximum age of a reading without the meter, Peak Basket goes to **Safe mode**. |
+| The sensors are **unavailable** for a few seconds after a restart | That is on purpose: the meter has not reported yet, and its fallback would tell the load 0 W. Your consumer uses its own default (EVCC the `//` value of its `jq`). After the maximum age of a reading without the meter, Peak Basket goes to **Safe mode**. |
 | The connection's **Grid import** does not drop to about 0 at a window start | The window average sensor does not cover the region's window. Use the meter's quarter-hour average, or the import counter. |
 | **Basket** never changes | That is right: it changes only when the peak goal changes, or when the monthly peak passes it. Watch **Grid import** and **Budget left**. |
 | The load stops at the end of every window | **Pulse – off** means the budget is used up. Lower the house load at that time, or raise the peak goal. |
