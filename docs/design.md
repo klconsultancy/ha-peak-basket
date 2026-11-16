@@ -221,6 +221,15 @@ powers are published rounded down to 10 W (never above the model's value), energ
 sensors change at most once per 5 s tick, except when the mode changes or the grid limit
 or the load's allowed power goes down: those are published at once.
 
+**Start-up.** Right after a Home Assistant restart the meter's integration may not have
+written a state yet. The fallback would then publish 0 W allowed power, which stops a load
+that was running (and some cars do not resume). So until the grid power and the window
+average (or import counter) have a fresh state, the sensors stay unavailable and a
+consumer keeps its own safe default, such as EVCC's static `maxPower`. The first
+evaluation with the meter is published at once. A meter still missing after the maximum
+age gives the fallback, as it does when one goes missing while running. A missing start
+value of the import counter is not a missing meter: that window falls back at once.
+
 `tests/test_jinja_parity.py` holds the model to the Jinja template it was ported from:
 6480 cases rendered by Home Assistant itself.
 

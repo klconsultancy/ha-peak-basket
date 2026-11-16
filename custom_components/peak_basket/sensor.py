@@ -291,6 +291,11 @@ class ConnectionSensor(CoordinatorEntity[PeakBasketCoordinator], RestoreEntity, 
         self.entity_id = f"sensor.{DOMAIN}_{description.key}"
 
     @property
+    def available(self) -> bool:
+        """Unavailable until the coordinator published its first evaluation."""
+        return super().available and self.coordinator.data is not None
+
+    @property
     def native_value(self) -> float | None:
         """Return the value from the latest evaluation."""
         return self.entity_description.value_fn(self.coordinator)
@@ -327,6 +332,11 @@ class LoadSensor(CoordinatorEntity[PeakBasketCoordinator], RestoreEntity, Sensor
             entry_type=DeviceEntryType.SERVICE,
             via_device_id=connection_device_id,
         )
+
+    @property
+    def available(self) -> bool:
+        """Unavailable until the coordinator published its first evaluation."""
+        return super().available and self.coordinator.data is not None
 
     @property
     def native_value(self) -> float | str | None:
