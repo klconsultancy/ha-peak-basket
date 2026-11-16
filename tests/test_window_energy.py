@@ -316,3 +316,36 @@ async def test_implausible_export_counter_falls_back_to_grid_power(
     await _at(hass, freezer, "2026-11-15T12:15:37+00:00", grid=-500, ev=0, export_kwh=10.005)
     # -500 W for 36 s, from the grid power.
     assert float(value(hass, "export")) == 5
+
+
+async def test_a_meter_ahead_keeps_the_windows_totals_up_to_the_boundary(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    """The meter's clock runs a few seconds ahead: its average resets before the boundary.
+
+    The window's import only grows, so a drop in its last seconds is the meter starting
+    the next window. Until Home Assistant's boundary the window keeps its last value.
+    """
+    await _at(hass, freezer, "2026-11-15T07:59:40+00:00", grid=1900, ev=0)
+    await setup_entry(hass, _sources())
+    await _at(hass, freezer, "2026-11-15T07:59:52+00:00", grid=1900, ev=0, average=1900)
+    assert float(value(hass, "used")) == 475  # 1900 W over 900 s
+    assert float(value(hass, "house_grid")) == 475
+
+    await _at(hass, freezer, "2026-11-15T07:59:58+00:00", grid=1900, ev=0, average=2)
+    assert float(value(hass, "used")) == 475
+    assert float(value(hass, "house_grid")) == 475
+
+    await _at(hass, freezer, "2026-11-15T08:00:03+00:00", grid=1900, ev=0, average=40)
+    assert float(value(hass, "used")) == 10
+
+
+async def test_a_drop_well_before_the_boundary_is_not_a_rollover(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    await _at(hass, freezer, "2026-11-15T07:56:00+00:00", grid=1900, ev=0)
+    await setup_entry(hass, _sources())
+    await _at(hass, freezer, "2026-11-15T07:56:30+00:00", grid=1900, ev=0, average=1900)
+    assert float(value(hass, "used")) == 475
+    await _at(hass, freezer, "2026-11-15T07:57:00+00:00", grid=1900, ev=0, average=40)
+    assert float(value(hass, "used")) == 10

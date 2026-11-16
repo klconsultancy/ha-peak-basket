@@ -52,6 +52,7 @@ from .const import (
     DEFAULT_LOAD,
     DOMAIN,
     LOGGER,
+    ROLLOVER_SECONDS,
     SUBENTRY_LOAD,
     TICK_SECONDS,
 )
@@ -204,6 +205,8 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
         self._sums: dict[str, float] = {}
         self._sums_window = window
         self._last_powers: tuple[datetime, list[float | None]] | None = None
+        # The window and its import from the meter's average, last taken as it was.
+        self._average_used: tuple[datetime, float] | None = None
         self._unsubs: list[CALLBACK_TYPE] = []
         self._started_at = dt_util.now()
 
@@ -470,7 +473,22 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
                 # then it shows the previous window's. Next to nothing is used this early.
                 return 0.0
             avg = self._power_w(str(avg_entity), now)
-            return None if avg is None else max(avg, 0.0) * self.profile.window_s / SECONDS_PER_HOUR
+            if avg is None:
+                return None
+            used = max(avg, 0.0) * self.profile.window_s / SECONDS_PER_HOUR
+            last = self._average_used
+            left = self.profile.window_s - (now - start).total_seconds()
+            if (
+                last is not None
+                and last[0] == start
+                and used < last[1]
+                and left <= ROLLOVER_SECONDS
+            ):
+                # The window's import only grows: the meter, its clock a few seconds
+                # ahead, has started the next window. Keep this one's until the boundary.
+                return last[1]
+            self._average_used = (start, used)
+            return used
 
         reading = self._energy_wh(self._entity(CONF_GRID_IMPORT_ENERGY), now)
         return self._import.since_start(start, now, reading, self._max_age)
