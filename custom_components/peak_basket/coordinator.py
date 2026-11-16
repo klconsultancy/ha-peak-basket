@@ -20,6 +20,7 @@ from homeassistant.const import (
 )
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, State, callback
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.event import async_track_state_change_event, async_track_time_interval
 from homeassistant.helpers.recorder import get_instance
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
@@ -331,6 +332,11 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
         if export_entity := self._src.get(CONF_GRID_EXPORT_ENERGY):
             reading = self._energy_wh(str(export_entity), now)
             exported = self._export.since_start(start, now, reading, self._max_age)
+            if exported is not None and exported > cap_wh:
+                # More than any grid connection can export since the boundary: the start
+                # value is wrong. The grid power's export is the better guess.
+                LOGGER.debug("Export %.0f Wh above %.0f Wh: from grid power", exported, cap_wh)
+                exported = None
         data = PeakBasketData(
             connection=connection, loads=results, flows=self._snapshot(used_wh, exported)
         )
@@ -496,9 +502,13 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
         return None if value is None else _to_wh(value, unit, entity_id)
 
     async def _async_counter_at(self, entity_id: str, when: datetime) -> float | None:
-        """Read an energy register at ``when`` from the recorder, after a restart."""
-        current = self.hass.states.get(entity_id)
-        unit = current.attributes.get(ATTR_UNIT_OF_MEASUREMENT) if current else None
+        """Read an energy register at ``when`` from the recorder, after a restart.
+
+        Right after a restart the meter may not have written a state yet, so the unit comes
+        from the recorded state itself, else the current state, else the entity registry.
+        Without one the start stays unknown: a kWh register taken as Wh would count about
+        the whole register as this window's.
+        """
         try:
             states = await get_instance(self.hass).async_add_executor_job(
                 partial(
@@ -509,7 +519,6 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
                     [entity_id],
                     include_start_time_state=True,
                     significant_changes_only=False,
-                    no_attributes=True,
                 )
             )
         except KeyError:  # the recorder is not set up
@@ -517,10 +526,22 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
         for state in states.get(entity_id, []):
             if isinstance(state, State):
                 try:
-                    return _to_wh(float(state.state), unit, entity_id)
+                    reading = float(state.state)
                 except ValueError:
                     continue
+                unit = self._energy_unit(entity_id, state)
+                if unit is None:
+                    LOGGER.info("No unit known for %s: fallback until the next window", entity_id)
+                    return None
+                return _to_wh(reading, unit, entity_id)
         return None
+
+    def _energy_unit(self, entity_id: str, recorded: State) -> str | None:
+        for state in (recorded, self.hass.states.get(entity_id)):
+            if state is not None and (unit := state.attributes.get(ATTR_UNIT_OF_MEASUREMENT)):
+                return str(unit)
+        entry = er.async_get(self.hass).async_get(entity_id)
+        return None if entry is None else entry.unit_of_measurement
 
 
 def _to_wh(value: float, unit: str | None, entity_id: str) -> float | None:

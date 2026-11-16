@@ -232,6 +232,58 @@ async def test_restart_mid_window_restores_the_counter_from_history(
     assert float(value(hass, "used")) == pytest.approx(100)
 
 
+def _recorder(rows: dict[str, list[Any]]) -> MagicMock:
+    recorder = MagicMock()
+    recorder.async_add_executor_job = AsyncMock(return_value=rows)
+    return recorder
+
+
+async def _restart_before_the_meter(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory, row: State
+) -> None:
+    """Start while the meter has no state yet, then let it report 100 Wh into the window."""
+    freezer.move_to(START)
+    hass.states.async_set(GRID, "1000", {"unit_of_measurement": "W"})
+    hass.states.async_set(EV, "0", {"unit_of_measurement": "W"})
+    with patch(
+        "custom_components.peak_basket.coordinator.get_instance",
+        return_value=_recorder({IMPORT: [row]}),
+    ):
+        await setup_entry(hass)
+    freezer.move_to(START + timedelta(seconds=10))
+    set_sources(hass, 1000, 100.1, 0)
+    await tick(hass)
+
+
+async def test_restart_before_the_meter_reports_takes_the_unit_from_history(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    await _restart_before_the_meter(
+        hass, freezer, State(IMPORT, "100.0", {"unit_of_measurement": "kWh"})
+    )
+    assert value(hass, "mode") == "continuous"
+    assert float(value(hass, "used")) == pytest.approx(100)
+
+
+async def test_restart_before_the_meter_reports_takes_the_unit_from_the_registry(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    er.async_get(hass).async_get_or_create(
+        "sensor", "p1", "import", suggested_object_id="p1_import", unit_of_measurement="kWh"
+    )
+    await _restart_before_the_meter(hass, freezer, State(IMPORT, "100.0"))
+    assert value(hass, "mode") == "continuous"
+    assert float(value(hass, "used")) == pytest.approx(100)
+
+
+async def test_restart_without_a_known_unit_does_not_guess_one(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    await _restart_before_the_meter(hass, freezer, State(IMPORT, "100.0"))
+    assert value(hass, "mode") == "fallback"
+    assert value(hass, "used") == "unknown"
+
+
 async def test_restart_without_a_row_at_the_window_start_falls_back(
     hass: HomeAssistant, freezer: FrozenDateTimeFactory
 ) -> None:

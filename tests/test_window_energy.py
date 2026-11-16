@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from homeassistant.core import State
 from homeassistant.helpers import entity_registry as er
@@ -298,3 +299,20 @@ async def test_a_stale_pv_power_counts_as_zero(
     await _at(hass, freezer, "2026-11-15T03:15:37+00:00", grid=8000, ev=7000, average=320)
     assert float(value(hass, "load_grid")) == 70
     assert float(value(hass, "solar")) == 0
+
+
+async def test_implausible_export_counter_falls_back_to_grid_power(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    """A start value that makes the window's export more than any connection can take."""
+    await _at(hass, freezer, "2026-11-15T12:15:01+00:00", grid=-500, ev=0, export_kwh=10.0)
+    recorder = MagicMock()
+    # A row in Wh where the register counts kWh: about the whole register in one window.
+    recorder.async_add_executor_job = AsyncMock(
+        return_value={EXPORT: [State(EXPORT, "10", {"unit_of_measurement": "Wh"})]}
+    )
+    with patch("custom_components.peak_basket.coordinator.get_instance", return_value=recorder):
+        await setup_entry(hass, _sources(grid_export_energy=EXPORT))
+    await _at(hass, freezer, "2026-11-15T12:15:37+00:00", grid=-500, ev=0, export_kwh=10.005)
+    # -500 W for 36 s, from the grid power.
+    assert float(value(hass, "export")) == 5

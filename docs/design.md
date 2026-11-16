@@ -132,7 +132,12 @@ when Home Assistant is away. Push adapters (a mapping from the advice to a `numb
   register's difference since the window start. Its start value is the last fresh reading
   before the boundary; that may count a few seconds of the previous window, which errs on
   the safe side. After a restart mid-window, it reads the register at the window start from
-  the recorder; without it, the window falls back.
+  the recorder; without it, the window falls back. The meter's integration may not have
+  written a state yet, so the unit comes with the recorded state, else from the current
+  state, else from the entity registry. Without a unit the window falls back too: a kWh
+  register taken as Wh would count nearly the whole register as this window's. The export
+  register is read the same way, and a window's export above the same 69 kW cap is
+  refused: the export then comes from the negative grid power.
 - **Staleness.** A source older than the configured maximum age counts as unavailable. The
   monthly peak is exempt: it changes rarely.
 - **A load's power** that is unavailable or older than the maximum age counts as 0 W, not
