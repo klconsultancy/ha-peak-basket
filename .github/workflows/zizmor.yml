@@ -1,0 +1,18 @@
+name: zizmor
+
+# Audits the workflows: unpinned actions, too-wide permissions, template injection,
+# credentials left in a checkout.
+on:
+  pull_request:
+    paths: [".github/**"]
+  push:
+    branches: [main]
+    paths: [".github/**"]
+
+permissions: {}
+
+jobs:
+  zizmor:
+    permissions:
+      contents: read
+    uses: klconsultancy/workflows/.github/workflows/zizmor.yml@c9502596494c47704b890d5cc66de73c06ba93d8 # main

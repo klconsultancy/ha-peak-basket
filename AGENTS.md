@@ -32,7 +32,8 @@ for the design and [`CONTEXT.md`](CONTEXT.md) for terms before changing code.
 - When a design choice or term changes, update `docs/design.md` or `CONTEXT.md` in the same
   PR. Do not create ADRs.
 - Dependency updates come from Renovate (`renovate.json`): grouped on the 1st and the 15th
-  and automerged once CI passes, except majors. A new Python minor version is raised by hand.
+  and automerged once CI passes, except majors and the pin on `klconsultancy/workflows` (its
+  own pull request, for review). A new Python minor version is raised by hand.
 
 ## Commands
 
