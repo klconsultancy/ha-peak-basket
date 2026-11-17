@@ -37,6 +37,7 @@ LOAD_FIELDS = {"load_power", "priority", "steer"}
 # And in its third, when the load is steered.
 STEERING_FIELDS = {"voltages", "min_a", "max_a", "reaction_s", "min_charge_s", "extra_a", "demand"}
 LOAD_KEYS = {
+    "power",
     "allowed_power",
     "grid_limit",
     "mode",

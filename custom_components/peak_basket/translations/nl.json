@@ -21,7 +21,7 @@
           "window_average": "Het lopende gemiddelde van de meter over de huidige meetperiode (bv. HomeWizard “gemiddeld verbruik”, DSMR 1.4.0). Het moet middelen over de meetperiode van de regio (een kwartier in Vlaanderen) en bij elk begin ervan terugvallen naar ongeveer 0; een gemiddelde over 5 minuten of een uur geeft een verkeerd budget. Te verkiezen boven de afnameteller: exact, ook meteen na een herstart.",
           "grid_import_energy": "De oplopende teller van de afgenomen energie (register 1.8.x). Gebruikt als er geen kwartiergemiddelde gekozen is.",
           "grid_export_energy": "De oplopende teller van de geïnjecteerde energie (register 2.8.x). Geeft de exacte injectie per meetperiode; zonder volgt injectie uit een negatief netvermogen.",
-          "month_peak": "Het hoogste kwartiergemiddelde van deze maand; de streefpiek zakt nooit daaronder.",
+          "month_peak": "Het hoogste kwartiergemiddelde van deze maand; de piekgrens zakt nooit daaronder.",
           "meter_voltages": "Spanning per fase aan de meter, in volgorde L1, L2, L3. Gebruikt voor elke afnemer waarvan de eigen spanning ontbreekt; anders wordt 230 V aangenomen."
         }
       },
@@ -78,7 +78,7 @@
           "window_average": "Het lopende gemiddelde van de meter over de huidige meetperiode (bv. HomeWizard “gemiddeld verbruik”, DSMR 1.4.0). Het moet middelen over de meetperiode van de regio (een kwartier in Vlaanderen) en bij elk begin ervan terugvallen naar ongeveer 0; een gemiddelde over 5 minuten of een uur geeft een verkeerd budget. Te verkiezen boven de afnameteller: exact, ook meteen na een herstart.",
           "grid_import_energy": "De oplopende teller van de afgenomen energie (register 1.8.x). Gebruikt als er geen kwartiergemiddelde gekozen is.",
           "grid_export_energy": "De oplopende teller van de geïnjecteerde energie (register 2.8.x). Geeft de exacte injectie per meetperiode; zonder volgt injectie uit een negatief netvermogen.",
-          "month_peak": "Het hoogste kwartiergemiddelde van deze maand; de streefpiek zakt nooit daaronder.",
+          "month_peak": "Het hoogste kwartiergemiddelde van deze maand; de piekgrens zakt nooit daaronder.",
           "meter_voltages": "Spanning per fase aan de meter, in volgorde L1, L2, L3. Gebruikt voor elke afnemer waarvan de eigen spanning ontbreekt; anders wordt 230 V aangenomen."
         }
       }
@@ -102,8 +102,8 @@
           "max_age_s": "Maximale ouderdom van een meting"
         },
         "data_description": {
-          "peak_goal_w": "Het gemiddelde vermogen per meetperiode dat je toelaat. De streefpiek is het hoogste van dit doel, de maandpiek en het minimum van de regio.",
-          "margin_w": "Blijft in elke meetperiode onaangeroerd, om meet- en timingfouten op te vangen.",
+          "peak_goal_w": "Een gemiddelde over de meetperiode: 5 500 W over 15 minuten is een kwartierbudget van 1 375 Wh. De piekgrens is het hoogste van dit doel, de maandpiek en het minimum van de regio.",
+          "margin_w": "Vermogen dat in elke meetperiode vrij blijft, om meet- en timingfouten op te vangen. Over de meetperiode is het de reserve: 100 W over 15 minuten is 25 Wh.",
           "max_age_s": "Een oudere meting van het netvermogen, het kwartiergemiddelde of de afnameteller telt als ontbrekend en zet de afnemers in de veilige stand. Een afnemer of de omvormer zonder recente meting telt als 0 W."
         }
       }
@@ -204,6 +204,9 @@
   },
   "entity": {
     "sensor": {
+      "power": {
+        "name": "Vermogen"
+      },
       "allowed_power": {
         "name": "Toegestaan vermogen"
       },
@@ -223,16 +226,16 @@
         "name": "Resterende minuten"
       },
       "load_room": {
-        "name": "Resterend budget"
+        "name": "Beschikbaar budget"
       },
       "target": {
-        "name": "Streefpiek"
+        "name": "Piekgrens"
       },
       "house_power": {
         "name": "Vermogen"
       },
       "basket": {
-        "name": "Korf"
+        "name": "Kwartierbudget"
       },
       "used": {
         "name": "Afname net"
@@ -241,13 +244,13 @@
         "name": "Resterend budget"
       },
       "house_reserve": {
-        "name": "Reserve"
+        "name": "Verwachte afname"
       },
       "load_reserve": {
-        "name": "Reserve"
+        "name": "Verwachte afname"
       },
       "margin": {
-        "name": "Marge"
+        "name": "Reserve"
       },
       "solar": {
         "name": "Zonneproductie"

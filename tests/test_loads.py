@@ -489,7 +489,12 @@ async def test_a_measured_only_load_has_only_its_import_sensors(
 ) -> None:
     hass.states.async_set("sensor.pv_power", "0", {"unit_of_measurement": "W"})
     entry, _, heat_pump = await _with_heat_pump(hass, freezer, pv_power="sensor.pv_power")
-    assert _load_keys(hass, entry, heat_pump) == {"load_grid", "load_solar", "load_reserve"}
+    assert _load_keys(hass, entry, heat_pump) == {
+        "power",
+        "load_grid",
+        "load_solar",
+        "load_reserve",
+    }
 
 
 async def test_the_basket_stacks_up_with_a_measured_only_load(
@@ -588,7 +593,7 @@ async def test_steering_a_measured_only_load_later_keeps_its_entity_ids(
         "priority": 0,
         "steer": False,
     }
-    assert _load_keys(hass, entry, heat_pump) == {"load_grid", "load_reserve"}
+    assert _load_keys(hass, entry, heat_pump) == {"power", "load_grid", "load_reserve"}
     assert _entity_ids(hass, entry) == before
 
 
@@ -630,3 +635,22 @@ async def test_a_negative_load_power_counts_as_zero(
     assert float(value(hass, "house_reserve")) + heat_pump_reserve + room == pytest.approx(
         float(value(hass, "remaining")), abs=2
     )
+
+
+async def test_a_load_power_is_what_the_model_uses(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    """Measured as it is; missing, stale or negative reads 0 W."""
+    freezer.move_to("2026-11-15T03:05:00+00:00")
+    set_sources(hass, 5140, 100.0, 4144)
+    await setup_entry(hass)
+    assert float(value(hass, "power")) == 4140
+    for ev in ("unavailable", "-100"):
+        set_sources(hass, 1000, 100.0, ev)
+        await tick(hass)
+        assert float(value(hass, "power")) == 0
+    set_sources(hass, 5140, 100.0, 4144)
+    freezer.move_to("2026-11-15T03:07:00+00:00")  # two minutes on: older than the 60 s
+    hass.states.async_set(GRID, "5140", {"unit_of_measurement": "W"})
+    await tick(hass)
+    assert float(value(hass, "power")) == 0
