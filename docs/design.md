@@ -190,8 +190,12 @@ load out of the house.
 
 A **measured-only load** (*Steer this load* off) is not steered: it gets no allowed power,
 grid limit, mode, run minutes or budget, only its grid and solar import, so the basket's
-history shows its share, and a **reserve** (`model/reserve.py`): its power times the time
-left, out of what remains after the house reserve, in priority order. A steered load's
+history shows its share, and a **reserve** (`model/reserve.py`): its grid share times the
+time left, out of what remains after the house reserve, in priority order. Only grid
+import comes out of the basket, so the measured loads together project the difference
+between the first steered load's house (`grid − Σ steered`) and the connection's
+(`grid − Σ all loads`), each at least 0: their power without solar, less when solar
+covers part of them. Each gets at most its own power. A steered load's
 room already leaves that out (the load is house to it), but the connection's house
 reserve does not hold it, so without it the stack house reserve + load room would stop
 short of what remains by the measured loads' expected use. For every steered load it is house, whatever its priority: it

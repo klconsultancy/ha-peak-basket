@@ -353,10 +353,11 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
                 exported = None
         measured = self.loads[len(self.steered) :]
         reserves = measured_reserves(
-            connection.remaining_wh,
-            connection.house_reserve_wh,
+            connection,
             powers[len(self.steered) :],
             self.profile.window_s - seconds,
+            grid,
+            sum(powers[: len(self.steered)]),
         )
         data = PeakBasketData(
             connection=connection,

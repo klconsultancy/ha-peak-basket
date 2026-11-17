@@ -173,8 +173,8 @@ On **each load's** device, named after the load:
 | **Grid import**, **Solar import** | What this load drew this window (Wh); solar only with solar power |
 
 A load that is only measured has **Grid import**, **Solar import** and **Reserve**: what it
-is expected to use until the window ends at its current power, out of what the house
-leaves (Wh). The steered loads' **Budget left** already leaves that room, so per window the
+is expected to draw from the grid until the window ends at its current power (solar
+excluded), out of what the house leaves (Wh). The steered loads' **Budget left** already leaves that room, so per window the
 house's **Reserve**, every measured-only load's **Reserve** and the first steered load's
 **Budget left** add up to the connection's **Budget left**.
 
