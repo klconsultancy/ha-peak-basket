@@ -36,7 +36,7 @@
         },
         "data_description": {
           "load_power": "The load's measured power.",
-          "priority": "Lower goes first. A load gets what the loads before it leave unused; the loads after it yield to it. For a load that is only measured, only the order its solar import is counted in.",
+          "priority": "Lower goes first. A load gets what the loads before it leave unused; the loads after it yield to it. For a load that is only measured, only the order its solar import is counted in, among the loads only measured: it always counts as house for the steered loads, so it never goes before one. To make it go first, steer it.",
           "steer": "On: Peak Basket gives it an allowed power, and your charger or an automation keeps it within that. Off: only measured, such as a heat pump you cannot steer: you see its grid and solar import, and the other loads count it as house."
         }
       },
@@ -127,7 +127,7 @@
           },
           "data_description": {
             "load_power": "The load's measured power.",
-            "priority": "Lower goes first. A load gets what the loads before it leave unused; the loads after it yield to it. For a load that is only measured, only the order its solar import is counted in.",
+            "priority": "Lower goes first. A load gets what the loads before it leave unused; the loads after it yield to it. For a load that is only measured, only the order its solar import is counted in, among the loads only measured: it always counts as house for the steered loads, so it never goes before one. To make it go first, steer it.",
             "steer": "On: Peak Basket gives it an allowed power, and your charger or an automation keeps it within that. Off: only measured, such as a heat pump you cannot steer: you see its grid and solar import, and the other loads count it as house."
           }
         },
@@ -162,7 +162,7 @@
           },
           "data_description": {
             "load_power": "The load's measured power.",
-            "priority": "Lower goes first. A load gets what the loads before it leave unused; the loads after it yield to it. For a load that is only measured, only the order its solar import is counted in.",
+            "priority": "Lower goes first. A load gets what the loads before it leave unused; the loads after it yield to it. For a load that is only measured, only the order its solar import is counted in, among the loads only measured: it always counts as house for the steered loads, so it never goes before one. To make it go first, steer it.",
             "steer": "On: Peak Basket gives it an allowed power, and your charger or an automation keeps it within that. Off: only measured, such as a heat pump you cannot steer: you see its grid and solar import, and the other loads count it as house."
           }
         },
@@ -241,6 +241,9 @@
         "name": "Budget left"
       },
       "house_reserve": {
+        "name": "Reserve"
+      },
+      "load_reserve": {
         "name": "Reserve"
       },
       "margin": {

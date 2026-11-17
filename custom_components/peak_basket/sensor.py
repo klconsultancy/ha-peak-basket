@@ -150,6 +150,18 @@ LOAD_SENSORS: tuple[LoadSensorDescription, ...] = (
 )
 
 
+# A measured-only load's share of what remains: the steered loads' room leaves it out.
+LOAD_RESERVE = LoadSensorDescription(
+    key="load_reserve",
+    translation_key="load_reserve",
+    native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
+    state_class=SensorStateClass.MEASUREMENT,
+    suggested_display_precision=0,
+    entity_category=EntityCategory.DIAGNOSTIC,
+    value_fn=lambda d, i: _wh(d.reserves.get(i)),
+)
+
+
 def _energy_sensor[D: (ConnectionSensorDescription, LoadSensorDescription)](
     cls: type[D], key: str, value_fn: Callable[..., float | None], *, restore: bool = False
 ) -> D:
@@ -221,7 +233,8 @@ async def async_setup_entry(
     solar = CONF_PV_POWER in entry.data
     register = CONF_GRID_EXPORT_ENERGY in entry.data
     connection_sensors = [*CONNECTION_SENSORS, HOUSE_GRID]
-    # Who drew from the basket, for every load; the decision only for a steered one.
+    # Who drew from the basket, for every load; the decision only for a steered one, the
+    # reserve only for a measured-only one.
     imports = [LOAD_GRID, LOAD_SOLAR] if solar else [LOAD_GRID]
     if solar:
         connection_sensors += SOLAR
@@ -230,7 +243,7 @@ async def async_setup_entry(
     # A source removed through Reconfigure takes its sensors with it, rather than leaving
     # them behind as unavailable.
     load_sensors = {
-        load.subentry_id: [*LOAD_SENSORS, *imports] if load.steered else imports
+        load.subentry_id: [*LOAD_SENSORS, *imports] if load.steered else [LOAD_RESERVE, *imports]
         for load in coordinator.loads
     }
     expected = {f"{entry.entry_id}_{d.key}" for d in connection_sensors} | {

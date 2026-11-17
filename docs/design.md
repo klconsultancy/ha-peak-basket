@@ -190,12 +190,16 @@ load out of the house.
 
 A **measured-only load** (*Steer this load* off) is not steered: it gets no allowed power,
 grid limit, mode, run minutes or budget, only its grid and solar import, so the basket's
-history shows its share. For every steered load it is house, whatever its priority: it
+history shows its share, and a **reserve** (`model/reserve.py`): its power times the time
+left, out of what remains after the house reserve, in priority order. A steered load's
+room already leaves that out (the load is house to it), but the connection's house
+reserve does not hold it, so without it the stack house reserve + load room would stop
+short of what remains by the measured loads' expected use. For every steered load it is house, whatever its priority: it
 does not yield, and it never claims. Its priority only orders the measured-only loads
 among themselves for the solar attribution. The connection's figures take it out of the
 house like any load. Its subentry holds only its power sensor and priority; steering it
 later through Reconfigure adds the steering sensors next to the import sensors, under the
-same unique IDs, so the entity IDs stay.
+same unique IDs, so the entity IDs stay; its reserve goes, since its room then covers it.
 
 ## The model
 

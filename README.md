@@ -38,8 +38,9 @@ Node-RED, ESPHome or an automation reads them and drives the load, with its own 
   else an **import energy counter**. The average must cover the region's window (15 minutes
   in Flanders) and drop back to about 0 at every window start: a 5-minute or an hourly
   average gives a wrong budget without a warning.
-- For each load: its **power** sensor. The load must follow the **Allowed power** Peak
-  Basket gives it (see [Several loads](#several-loads)).
+- For each load: its **power** sensor. A steered load must follow the **Allowed power**
+  Peak Basket gives it; a load that is only measured need not (see
+  [Several loads](#several-loads)).
 
 Optional: the monthly peak, the phase voltages of the meter and of each load, the solar
 power (your inverter), and the export counter.
@@ -118,11 +119,13 @@ it takes budget the others were promised.
 A consumer you cannot steer, such as a heat pump that reports its power but cannot follow
 an allowed power, can still be added with **Steer this load** off: it is then **only
 measured**. You only give its name, power sensor and priority, and it gets only **Grid
-import** and **Solar import** (with solar power), so you see its share of the basket. For
+import**, **Solar import** (with solar power) and **Reserve**, so you see its share of the
+basket. For
 the steered loads it counts as house, wherever its priority puts it: it does not yield and
 never reserves budget. Solar goes to the steered loads first, then to the loads only
 measured (in priority order), then to the house. Turn **Steer this load** on later with
-**Reconfigure**: the steering sensors are added and the entity IDs stay.
+**Reconfigure**: the steering sensors take the place of **Reserve**, and the import
+sensors keep their entity IDs.
 
 Consumers you do not add at all are part of the **house**: everything the connection uses
 that Peak Basket does not measure separately.
@@ -169,6 +172,12 @@ On **each load's** device, named after the load:
 | **Budget left** | The energy left for this load in this window (Wh) |
 | **Grid import**, **Solar import** | What this load drew this window (Wh); solar only with solar power |
 
+A load that is only measured has **Grid import**, **Solar import** and **Reserve**: what it
+is expected to use until the window ends at its current power, out of what the house
+leaves (Wh). The steered loads' **Budget left** already leaves that room, so per window the
+house's **Reserve**, every measured-only load's **Reserve** and the first steered load's
+**Budget left** add up to the connection's **Budget left**.
+
 A load's entity IDs follow its name and the language Home Assistant has when the load is
 added: for a load named "EV charger", the grid limit is `sensor.ev_charger_grid_limit` on
 an English system and `sensor.ev_charger_netlimiet` on a Dutch one. Copy them from
@@ -183,7 +192,8 @@ window's total. Per window:
 - **Solar production** = the house's **Solar import** + every load's **Solar import** +
   **Export**.
 
-Solar counts for the loads first, in priority order, then for the house.
+Solar counts for the steered loads first, in priority order, then for the loads that are
+only measured, in priority order, then for the house.
 
 ## Using it
 

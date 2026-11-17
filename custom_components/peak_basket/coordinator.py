@@ -66,6 +66,7 @@ from .model import (
     allocate_solar,
     compute_target,
     evaluate,
+    measured_reserves,
 )
 from .model.window import window_start
 
@@ -136,6 +137,8 @@ class PeakBasketData:
     """By subentry id."""
     flows: Flows = field(default_factory=Flows)
     """Who drew from the basket this window."""
+    reserves: dict[str, float | None] = field(default_factory=dict)
+    """Per measured-only load, by subentry id: its power until the window ends (Wh)."""
 
 
 @dataclass
@@ -348,8 +351,18 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
                 # value is wrong. The grid power's export is the better guess.
                 LOGGER.debug("Export %.0f Wh above %.0f Wh: from grid power", exported, cap_wh)
                 exported = None
+        measured = self.loads[len(self.steered) :]
+        reserves = measured_reserves(
+            connection.remaining_wh,
+            connection.house_reserve_wh,
+            powers[len(self.steered) :],
+            self.profile.window_s - seconds,
+        )
         data = PeakBasketData(
-            connection=connection, loads=results, flows=self._snapshot(used_wh, exported)
+            connection=connection,
+            loads=results,
+            flows=self._snapshot(used_wh, exported),
+            reserves={load.subentry_id: r for load, r in zip(measured, reserves, strict=True)},
         )
         if self._must_publish(data, now, force=force):
             self._published_at = now

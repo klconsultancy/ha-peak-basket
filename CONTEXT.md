@@ -47,7 +47,9 @@ has the decision's sensors (allowed power, grid limit, mode, ...).
 **Measured-only load** (*Steer this load* off)
 : A load Peak Basket only measures, such as a heat pump that cannot follow an allowed power.
 It counts as house for every steered load, never claims, and has only its grid and solar
-import. Solar goes to it after the steered loads, before the house.
+import and a reserve: its power until the window ends, out of what the house leaves, so
+the house reserve, the measured reserves and the first steered load's room add up to what
+remains. Its priority only orders the measured-only loads among themselves for solar. Solar goes to it after the steered loads, before the house.
 
 **Priority**
 : The order loads go in, lower first. A load counts the loads before it as house, and the

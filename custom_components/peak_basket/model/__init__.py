@@ -10,6 +10,7 @@ from .engine import (
     phase_voltage_sum,
 )
 from .profiles import BE_FLANDERS, PROFILES, RegionProfile
+from .reserve import measured_reserves
 from .solar import SolarAllocation, allocate_solar
 from .window import seconds_in_window, window_start
 
@@ -25,6 +26,7 @@ __all__ = [
     "allocate_solar",
     "compute_target",
     "evaluate",
+    "measured_reserves",
     "phase_voltage_sum",
     "seconds_in_window",
     "window_start",

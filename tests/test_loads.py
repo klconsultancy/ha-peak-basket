@@ -489,7 +489,21 @@ async def test_a_measured_only_load_has_only_its_import_sensors(
 ) -> None:
     hass.states.async_set("sensor.pv_power", "0", {"unit_of_measurement": "W"})
     entry, _, heat_pump = await _with_heat_pump(hass, freezer, pv_power="sensor.pv_power")
-    assert _load_keys(hass, entry, heat_pump) == {"load_grid", "load_solar"}
+    assert _load_keys(hass, entry, heat_pump) == {"load_grid", "load_solar", "load_reserve"}
+
+
+async def test_the_basket_stacks_up_with_a_measured_only_load(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    """House reserve, the heat pump's reserve and the EV's room: what remains."""
+    entry, ev, heat_pump = await _with_heat_pump(hass, freezer)
+    house_reserve = float(value(hass, "house_reserve"))
+    heat_pump_reserve = float(_load_value(hass, entry, heat_pump, "load_reserve"))
+    room = float(_load_value(hass, entry, ev, "load_room"))
+    assert heat_pump_reserve == pytest.approx(2000 * 899 / 3600, abs=1)
+    assert house_reserve + heat_pump_reserve + room == pytest.approx(
+        float(value(hass, "remaining")), abs=2
+    )
 
 
 async def test_who_drew_from_the_grid_adds_up_with_a_measured_only_load(
@@ -562,8 +576,11 @@ async def test_steering_a_measured_only_load_later_keeps_its_entity_ids(
     await _reconfigure_load(hass, entry, heat_pump, steer=True)
     assert entry.subentries[heat_pump].data["steer"] is True
     assert _load_keys(hass, entry, heat_pump) >= {"allowed_power", "grid_limit", "mode"}
+    # A steered load's share is in its room, not in a reserve of its own.
+    assert "load_reserve" not in _load_keys(hass, entry, heat_pump)
     after = _entity_ids(hass, entry)
-    assert {k: v for k, v in after.items() if k in before} == before
+    kept = {k: v for k, v in before.items() if not k.endswith("_load_reserve")}
+    assert {k: v for k, v in after.items() if k in before} == kept
 
     await _reconfigure_load(hass, entry, heat_pump, steer=False)
     assert dict(entry.subentries[heat_pump].data) == {
@@ -571,5 +588,5 @@ async def test_steering_a_measured_only_load_later_keeps_its_entity_ids(
         "priority": 0,
         "steer": False,
     }
-    assert _load_keys(hass, entry, heat_pump) == {"load_grid"}
+    assert _load_keys(hass, entry, heat_pump) == {"load_grid", "load_reserve"}
     assert _entity_ids(hass, entry) == before

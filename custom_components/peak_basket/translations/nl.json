@@ -36,7 +36,7 @@
         },
         "data_description": {
           "load_power": "Het gemeten vermogen van de afnemer.",
-          "priority": "Lager gaat voor. Een afnemer krijgt wat de afnemers vóór hem onbenut laten; de afnemers na hem wijken voor hem. Voor een afnemer die alleen gemeten wordt, enkel de volgorde waarin zijn afname zon geteld wordt.",
+          "priority": "Lager gaat voor. Een afnemer krijgt wat de afnemers vóór hem onbenut laten; de afnemers na hem wijken voor hem. Voor een afnemer die alleen gemeten wordt, enkel de volgorde waarin zijn afname zon geteld wordt, onder de alleen gemeten afnemers: voor de gestuurde afnemers telt hij altijd als huis, dus hij gaat nooit voor een gestuurde. Wil je dat hij voorgaat, stuur hem dan.",
           "steer": "Aan: Peak Basket geeft hem een toegestaan vermogen, en je laadpaal of een automatisatie houdt hem daaronder. Uit: alleen gemeten, zoals een warmtepomp die je niet kunt sturen: je ziet zijn afname net en zon, en de andere afnemers tellen hem als huis."
         }
       },
@@ -127,7 +127,7 @@
           },
           "data_description": {
             "load_power": "Het gemeten vermogen van de afnemer.",
-            "priority": "Lager gaat voor. Een afnemer krijgt wat de afnemers vóór hem onbenut laten; de afnemers na hem wijken voor hem. Voor een afnemer die alleen gemeten wordt, enkel de volgorde waarin zijn afname zon geteld wordt.",
+            "priority": "Lager gaat voor. Een afnemer krijgt wat de afnemers vóór hem onbenut laten; de afnemers na hem wijken voor hem. Voor een afnemer die alleen gemeten wordt, enkel de volgorde waarin zijn afname zon geteld wordt, onder de alleen gemeten afnemers: voor de gestuurde afnemers telt hij altijd als huis, dus hij gaat nooit voor een gestuurde. Wil je dat hij voorgaat, stuur hem dan.",
             "steer": "Aan: Peak Basket geeft hem een toegestaan vermogen, en je laadpaal of een automatisatie houdt hem daaronder. Uit: alleen gemeten, zoals een warmtepomp die je niet kunt sturen: je ziet zijn afname net en zon, en de andere afnemers tellen hem als huis."
           }
         },
@@ -162,7 +162,7 @@
           },
           "data_description": {
             "load_power": "Het gemeten vermogen van de afnemer.",
-            "priority": "Lager gaat voor. Een afnemer krijgt wat de afnemers vóór hem onbenut laten; de afnemers na hem wijken voor hem. Voor een afnemer die alleen gemeten wordt, enkel de volgorde waarin zijn afname zon geteld wordt.",
+            "priority": "Lager gaat voor. Een afnemer krijgt wat de afnemers vóór hem onbenut laten; de afnemers na hem wijken voor hem. Voor een afnemer die alleen gemeten wordt, enkel de volgorde waarin zijn afname zon geteld wordt, onder de alleen gemeten afnemers: voor de gestuurde afnemers telt hij altijd als huis, dus hij gaat nooit voor een gestuurde. Wil je dat hij voorgaat, stuur hem dan.",
             "steer": "Aan: Peak Basket geeft hem een toegestaan vermogen, en je laadpaal of een automatisatie houdt hem daaronder. Uit: alleen gemeten, zoals een warmtepomp die je niet kunt sturen: je ziet zijn afname net en zon, en de andere afnemers tellen hem als huis."
           }
         },
@@ -241,6 +241,9 @@
         "name": "Resterend budget"
       },
       "house_reserve": {
+        "name": "Reserve"
+      },
+      "load_reserve": {
         "name": "Reserve"
       },
       "margin": {
