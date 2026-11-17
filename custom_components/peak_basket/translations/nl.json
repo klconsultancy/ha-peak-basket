@@ -27,13 +27,25 @@
       },
       "load": {
         "title": "Eerste afnemer",
-        "description": "Een toestel dat zijn vermogen kan aanpassen, zoals een laadpaal. Peak Basket berekent hoeveel het mag nemen; je laadpaal of een automatisatie stuurt het toestel. Het huis telt al mee: dat is de afnemer die Peak Basket niet stuurt. Meer afnemers voeg je later toe met “Afnemer toevoegen”.",
+        "description": "Een toestel waarvan Peak Basket het vermogen meet, zoals een laadpaal of een warmtepomp. Een gestuurde afnemer krijgt het vermogen dat hij mag nemen; je laadpaal of een automatisatie stuurt het toestel. Het huis telt al mee: dat is wat Peak Basket niet apart meet. Meer afnemers voeg je later toe met “Afnemer toevoegen”.",
         "data": {
           "name": "Naam",
           "load_power": "Gemeten vermogen",
-          "voltages": "Spanning per fase aan de afnemer (optioneel)",
           "priority": "Prioriteit",
+          "steer": "Deze afnemer sturen"
+        },
+        "data_description": {
+          "load_power": "Het gemeten vermogen van de afnemer.",
+          "priority": "Lager gaat voor. Een afnemer krijgt wat de afnemers vóór hem onbenut laten; de afnemers na hem wijken voor hem. Voor een afnemer die alleen gemeten wordt, enkel de volgorde waarin zijn afname zon geteld wordt.",
+          "steer": "Aan: Peak Basket geeft hem een toegestaan vermogen, en je laadpaal of een automatisatie houdt hem daaronder. Uit: alleen gemeten, zoals een warmtepomp die je niet kunt sturen: je ziet zijn afname net en zon, en de andere afnemers tellen hem als huis."
+        }
+      },
+      "load_steering": {
+        "title": "Sturing",
+        "description": "Hoe Peak Basket deze afnemer stuurt.",
+        "data": {
           "demand": "Wil vermogen (optioneel)",
+          "voltages": "Spanning per fase aan de afnemer (optioneel)",
           "min_a": "Minimale stroom",
           "max_a": "Maximale stroom",
           "reaction_s": "Reactietijd",
@@ -41,10 +53,8 @@
           "extra_a": "Inhaalstroom laatste 5 minuten"
         },
         "data_description": {
-          "load_power": "Het gemeten vermogen van de afnemer.",
-          "voltages": "Gemeten spanning per fase aan de afnemer, in volgorde L1, L2, L3. Samen met de minimale en maximale stroom bepalen ze het vermogensbereik. Zonder: de spanning van de meter, anders 230 V.",
-          "priority": "Lager gaat voor. Een afnemer krijgt wat de afnemers vóór hem onbenut laten; de afnemers na hem wijken voor hem.",
           "demand": "Alleen nodig met meerdere afnemers. Een entiteit die aan staat zolang deze afnemer stroom wil, zoals “auto aangesloten” van een laadpaal of een thermostaat die warmte vraagt. Zolang ze aan staat, houdt Peak Basket budget voor deze afnemer vrij, ook als hij nog niets trekt; de afnemers na hem kunnen dat budget dan niet gebruiken. Zonder deze entiteit duurt die reservering de reactietijd.",
+          "voltages": "Gemeten spanning per fase aan de afnemer, in volgorde L1, L2, L3. Samen met de minimale en maximale stroom bepalen ze het vermogensbereik. Zonder: de spanning van de meter, anders 230 V.",
           "reaction_s": "Tijd tussen een lagere limiet en het effectief zakken van de afnemer (bv. EVCC ≈ 20 s + 30 s cache).",
           "min_charge_s": "Is er niet genoeg voor de hele meetperiode, dan start de afnemer pas als er nog minstens zo lang budget over is.",
           "extra_a": "Hoeveel stroom per fase de afnemer in de laatste 5 minuten van een meetperiode extra mag nemen, om een rustig begin in te halen."
@@ -108,13 +118,25 @@
       "step": {
         "user": {
           "title": "Afnemer toevoegen",
-          "description": "Een toestel dat zijn vermogen kan aanpassen, zoals een laadpaal. Peak Basket berekent hoeveel het mag nemen; je laadpaal of een automatisatie stuurt het toestel.",
+          "description": "Een toestel waarvan Peak Basket het vermogen meet, zoals een laadpaal of een warmtepomp. Een gestuurde afnemer krijgt het vermogen dat hij mag nemen; je laadpaal of een automatisatie stuurt het toestel.",
           "data": {
             "name": "Naam",
             "load_power": "Gemeten vermogen",
-            "voltages": "Spanning per fase aan de afnemer (optioneel)",
             "priority": "Prioriteit",
+            "steer": "Deze afnemer sturen"
+          },
+          "data_description": {
+            "load_power": "Het gemeten vermogen van de afnemer.",
+            "priority": "Lager gaat voor. Een afnemer krijgt wat de afnemers vóór hem onbenut laten; de afnemers na hem wijken voor hem. Voor een afnemer die alleen gemeten wordt, enkel de volgorde waarin zijn afname zon geteld wordt.",
+            "steer": "Aan: Peak Basket geeft hem een toegestaan vermogen, en je laadpaal of een automatisatie houdt hem daaronder. Uit: alleen gemeten, zoals een warmtepomp die je niet kunt sturen: je ziet zijn afname net en zon, en de andere afnemers tellen hem als huis."
+          }
+        },
+        "steering": {
+          "title": "Sturing",
+          "description": "Hoe Peak Basket deze afnemer stuurt.",
+          "data": {
             "demand": "Wil vermogen (optioneel)",
+            "voltages": "Spanning per fase aan de afnemer (optioneel)",
             "min_a": "Minimale stroom",
             "max_a": "Maximale stroom",
             "reaction_s": "Reactietijd",
@@ -122,10 +144,8 @@
             "extra_a": "Inhaalstroom laatste 5 minuten"
           },
           "data_description": {
-            "load_power": "Het gemeten vermogen van de afnemer.",
-            "voltages": "Gemeten spanning per fase aan de afnemer, in volgorde L1, L2, L3. Samen met de minimale en maximale stroom bepalen ze het vermogensbereik. Zonder: de spanning van de meter, anders 230 V.",
-            "priority": "Lager gaat voor. Een afnemer krijgt wat de afnemers vóór hem onbenut laten; de afnemers na hem wijken voor hem.",
             "demand": "Alleen nodig met meerdere afnemers. Een entiteit die aan staat zolang deze afnemer stroom wil, zoals “auto aangesloten” van een laadpaal of een thermostaat die warmte vraagt. Zolang ze aan staat, houdt Peak Basket budget voor deze afnemer vrij, ook als hij nog niets trekt; de afnemers na hem kunnen dat budget dan niet gebruiken. Zonder deze entiteit duurt die reservering de reactietijd.",
+            "voltages": "Gemeten spanning per fase aan de afnemer, in volgorde L1, L2, L3. Samen met de minimale en maximale stroom bepalen ze het vermogensbereik. Zonder: de spanning van de meter, anders 230 V.",
             "reaction_s": "Tijd tussen een lagere limiet en het effectief zakken van de afnemer (bv. EVCC ≈ 20 s + 30 s cache).",
             "min_charge_s": "Is er niet genoeg voor de hele meetperiode, dan start de afnemer pas als er nog minstens zo lang budget over is.",
             "extra_a": "Hoeveel stroom per fase de afnemer in de laatste 5 minuten van een meetperiode extra mag nemen, om een rustig begin in te halen."
@@ -133,13 +153,25 @@
         },
         "reconfigure": {
           "title": "Afnemer wijzigen",
-          "description": "Een toestel dat zijn vermogen kan aanpassen, zoals een laadpaal. Peak Basket berekent hoeveel het mag nemen; je laadpaal of een automatisatie stuurt het toestel.",
+          "description": "Een toestel waarvan Peak Basket het vermogen meet, zoals een laadpaal of een warmtepomp. Een gestuurde afnemer krijgt het vermogen dat hij mag nemen; je laadpaal of een automatisatie stuurt het toestel.",
           "data": {
             "name": "Naam",
             "load_power": "Gemeten vermogen",
-            "voltages": "Spanning per fase aan de afnemer (optioneel)",
             "priority": "Prioriteit",
+            "steer": "Deze afnemer sturen"
+          },
+          "data_description": {
+            "load_power": "Het gemeten vermogen van de afnemer.",
+            "priority": "Lager gaat voor. Een afnemer krijgt wat de afnemers vóór hem onbenut laten; de afnemers na hem wijken voor hem. Voor een afnemer die alleen gemeten wordt, enkel de volgorde waarin zijn afname zon geteld wordt.",
+            "steer": "Aan: Peak Basket geeft hem een toegestaan vermogen, en je laadpaal of een automatisatie houdt hem daaronder. Uit: alleen gemeten, zoals een warmtepomp die je niet kunt sturen: je ziet zijn afname net en zon, en de andere afnemers tellen hem als huis."
+          }
+        },
+        "reconfigure_steering": {
+          "title": "Sturing",
+          "description": "Hoe Peak Basket deze afnemer stuurt.",
+          "data": {
             "demand": "Wil vermogen (optioneel)",
+            "voltages": "Spanning per fase aan de afnemer (optioneel)",
             "min_a": "Minimale stroom",
             "max_a": "Maximale stroom",
             "reaction_s": "Reactietijd",
@@ -147,10 +179,8 @@
             "extra_a": "Inhaalstroom laatste 5 minuten"
           },
           "data_description": {
-            "load_power": "Het gemeten vermogen van de afnemer.",
-            "voltages": "Gemeten spanning per fase aan de afnemer, in volgorde L1, L2, L3. Samen met de minimale en maximale stroom bepalen ze het vermogensbereik. Zonder: de spanning van de meter, anders 230 V.",
-            "priority": "Lager gaat voor. Een afnemer krijgt wat de afnemers vóór hem onbenut laten; de afnemers na hem wijken voor hem.",
             "demand": "Alleen nodig met meerdere afnemers. Een entiteit die aan staat zolang deze afnemer stroom wil, zoals “auto aangesloten” van een laadpaal of een thermostaat die warmte vraagt. Zolang ze aan staat, houdt Peak Basket budget voor deze afnemer vrij, ook als hij nog niets trekt; de afnemers na hem kunnen dat budget dan niet gebruiken. Zonder deze entiteit duurt die reservering de reactietijd.",
+            "voltages": "Gemeten spanning per fase aan de afnemer, in volgorde L1, L2, L3. Samen met de minimale en maximale stroom bepalen ze het vermogensbereik. Zonder: de spanning van de meter, anders 230 V.",
             "reaction_s": "Tijd tussen een lagere limiet en het effectief zakken van de afnemer (bv. EVCC ≈ 20 s + 30 s cache).",
             "min_charge_s": "Is er niet genoeg voor de hele meetperiode, dan start de afnemer pas als er nog minstens zo lang budget over is.",
             "extra_a": "Hoeveel stroom per fase de afnemer in de laatste 5 minuten van een meetperiode extra mag nemen, om een rustig begin in te halen."

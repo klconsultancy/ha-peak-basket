@@ -1,9 +1,9 @@
 """Attribution of solar self-consumption to loads, a display convention.
 
 Physically and for the grid operator this makes no difference. For display, solar goes
-to the controllable loads first (in priority order) and the rest to the house, so the
-house carries most of the grid import and you see how much the flexible loads leaned on
-the basket.
+to the loads first, in the order given (the steered loads by priority, then the
+measured-only ones), and the rest to the house, so the house carries most of the grid
+import and you see how much the flexible loads leaned on the basket.
 
 Works on power (W) or on energy per window (Wh) alike.
 """

@@ -27,13 +27,25 @@
       },
       "load": {
         "title": "First load",
-        "description": "A device that can adjust its power, such as an EV charger. Peak Basket calculates how much it may draw; your charger or an automation controls it. The house is already counted: it is the load Peak Basket does not steer. Add more loads later with “Add load”.",
+        "description": "A device whose power Peak Basket measures, such as an EV charger or a heat pump. A steered load gets the power it may draw; your charger or an automation controls it. The house is already counted: it is what Peak Basket does not measure separately. Add more loads later with “Add load”.",
         "data": {
           "name": "Name",
           "load_power": "Measured power",
-          "voltages": "Load phase voltages (optional)",
           "priority": "Priority",
+          "steer": "Steer this load"
+        },
+        "data_description": {
+          "load_power": "The load's measured power.",
+          "priority": "Lower goes first. A load gets what the loads before it leave unused; the loads after it yield to it. For a load that is only measured, only the order its solar import is counted in.",
+          "steer": "On: Peak Basket gives it an allowed power, and your charger or an automation keeps it within that. Off: only measured, such as a heat pump you cannot steer: you see its grid and solar import, and the other loads count it as house."
+        }
+      },
+      "load_steering": {
+        "title": "Steering",
+        "description": "How Peak Basket steers this load.",
+        "data": {
           "demand": "Wants power (optional)",
+          "voltages": "Load phase voltages (optional)",
           "min_a": "Minimum current",
           "max_a": "Maximum current",
           "reaction_s": "Reaction time",
@@ -41,10 +53,8 @@
           "extra_a": "Catch-up current, last 5 minutes"
         },
         "data_description": {
-          "load_power": "The load's measured power.",
-          "voltages": "Measured voltage per phase at the load, in order L1, L2, L3. With the minimum and maximum current they set its power range. Without them: the meter's voltage, else 230 V.",
-          "priority": "Lower goes first. A load gets what the loads before it leave unused; the loads after it yield to it.",
           "demand": "Only needed with more than one load. An entity that is on while this load wants power, such as the “vehicle connected” sensor of a charger or a thermostat calling for heat. While it is on, Peak Basket keeps budget for this load even before it draws anything, so the loads after it cannot use that budget. Without it, that reservation lasts the reaction time.",
+          "voltages": "Measured voltage per phase at the load, in order L1, L2, L3. With the minimum and maximum current they set its power range. Without them: the meter's voltage, else 230 V.",
           "reaction_s": "Time between a lower limit and the load actually dropping (e.g. EVCC ≈ 20 s + 30 s cache).",
           "min_charge_s": "When there is not enough for the whole window, the load only starts when budget for at least this long is left.",
           "extra_a": "How much extra current per phase the load may draw in the last 5 minutes of a window, to catch up on a quiet start."
@@ -108,13 +118,25 @@
       "step": {
         "user": {
           "title": "Add load",
-          "description": "A device that can adjust its power, such as an EV charger. Peak Basket calculates how much it may draw; your charger or an automation controls it.",
+          "description": "A device whose power Peak Basket measures, such as an EV charger or a heat pump. A steered load gets the power it may draw; your charger or an automation controls it.",
           "data": {
             "name": "Name",
             "load_power": "Measured power",
-            "voltages": "Load phase voltages (optional)",
             "priority": "Priority",
+            "steer": "Steer this load"
+          },
+          "data_description": {
+            "load_power": "The load's measured power.",
+            "priority": "Lower goes first. A load gets what the loads before it leave unused; the loads after it yield to it. For a load that is only measured, only the order its solar import is counted in.",
+            "steer": "On: Peak Basket gives it an allowed power, and your charger or an automation keeps it within that. Off: only measured, such as a heat pump you cannot steer: you see its grid and solar import, and the other loads count it as house."
+          }
+        },
+        "steering": {
+          "title": "Steering",
+          "description": "How Peak Basket steers this load.",
+          "data": {
             "demand": "Wants power (optional)",
+            "voltages": "Load phase voltages (optional)",
             "min_a": "Minimum current",
             "max_a": "Maximum current",
             "reaction_s": "Reaction time",
@@ -122,10 +144,8 @@
             "extra_a": "Catch-up current, last 5 minutes"
           },
           "data_description": {
-            "load_power": "The load's measured power.",
-            "voltages": "Measured voltage per phase at the load, in order L1, L2, L3. With the minimum and maximum current they set its power range. Without them: the meter's voltage, else 230 V.",
-            "priority": "Lower goes first. A load gets what the loads before it leave unused; the loads after it yield to it.",
             "demand": "Only needed with more than one load. An entity that is on while this load wants power, such as the “vehicle connected” sensor of a charger or a thermostat calling for heat. While it is on, Peak Basket keeps budget for this load even before it draws anything, so the loads after it cannot use that budget. Without it, that reservation lasts the reaction time.",
+            "voltages": "Measured voltage per phase at the load, in order L1, L2, L3. With the minimum and maximum current they set its power range. Without them: the meter's voltage, else 230 V.",
             "reaction_s": "Time between a lower limit and the load actually dropping (e.g. EVCC ≈ 20 s + 30 s cache).",
             "min_charge_s": "When there is not enough for the whole window, the load only starts when budget for at least this long is left.",
             "extra_a": "How much extra current per phase the load may draw in the last 5 minutes of a window, to catch up on a quiet start."
@@ -133,13 +153,25 @@
         },
         "reconfigure": {
           "title": "Change load",
-          "description": "A device that can adjust its power, such as an EV charger. Peak Basket calculates how much it may draw; your charger or an automation controls it.",
+          "description": "A device whose power Peak Basket measures, such as an EV charger or a heat pump. A steered load gets the power it may draw; your charger or an automation controls it.",
           "data": {
             "name": "Name",
             "load_power": "Measured power",
-            "voltages": "Load phase voltages (optional)",
             "priority": "Priority",
+            "steer": "Steer this load"
+          },
+          "data_description": {
+            "load_power": "The load's measured power.",
+            "priority": "Lower goes first. A load gets what the loads before it leave unused; the loads after it yield to it. For a load that is only measured, only the order its solar import is counted in.",
+            "steer": "On: Peak Basket gives it an allowed power, and your charger or an automation keeps it within that. Off: only measured, such as a heat pump you cannot steer: you see its grid and solar import, and the other loads count it as house."
+          }
+        },
+        "reconfigure_steering": {
+          "title": "Steering",
+          "description": "How Peak Basket steers this load.",
+          "data": {
             "demand": "Wants power (optional)",
+            "voltages": "Load phase voltages (optional)",
             "min_a": "Minimum current",
             "max_a": "Maximum current",
             "reaction_s": "Reaction time",
@@ -147,10 +179,8 @@
             "extra_a": "Catch-up current, last 5 minutes"
           },
           "data_description": {
-            "load_power": "The load's measured power.",
-            "voltages": "Measured voltage per phase at the load, in order L1, L2, L3. With the minimum and maximum current they set its power range. Without them: the meter's voltage, else 230 V.",
-            "priority": "Lower goes first. A load gets what the loads before it leave unused; the loads after it yield to it.",
             "demand": "Only needed with more than one load. An entity that is on while this load wants power, such as the “vehicle connected” sensor of a charger or a thermostat calling for heat. While it is on, Peak Basket keeps budget for this load even before it draws anything, so the loads after it cannot use that budget. Without it, that reservation lasts the reaction time.",
+            "voltages": "Measured voltage per phase at the load, in order L1, L2, L3. With the minimum and maximum current they set its power range. Without them: the meter's voltage, else 230 V.",
             "reaction_s": "Time between a lower limit and the load actually dropping (e.g. EVCC ≈ 20 s + 30 s cache).",
             "min_charge_s": "When there is not enough for the whole window, the load only starts when budget for at least this long is left.",
             "extra_a": "How much extra current per phase the load may draw in the last 5 minutes of a window, to catch up on a quiet start."

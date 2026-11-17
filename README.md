@@ -76,11 +76,13 @@ A HACS install moves to the Marketplace by itself on the first start of 2026.11.
 1. **Settings → Devices & services → Add integration → Peak Basket.**
 2. **The grid connection:** the tariff region and the meter's sensors. Prefer the window
    average over the import counter: it is exact, also right after a restart.
-3. **The first load,** such as the EV charger: its power sensor, its phase voltages (per
-   phase the load's voltage is used, else the meter's, else 230 V), its current range, its
-   reaction time and its minimum run time. **Wants power** only matters with more than one
-   load: see [Several loads](#several-loads).
-4. **More loads:** **Add load** on the Peak Basket page. **Reconfigure** on a load changes it.
+3. **The first load,** such as the EV charger: its power sensor, its priority and whether
+   Peak Basket steers it. A steered load then asks how: its phase voltages (per phase the
+   load's voltage is used, else the meter's, else 230 V), its current range, its reaction
+   time and its minimum run time. **Wants power** only matters with more than one load: see
+   [Several loads](#several-loads).
+4. **More loads:** **Add load** on the Peak Basket page. **Reconfigure** on a load changes it,
+   also from only measured to steered and back: its entity IDs stay.
    **Reconfigure** on the Peak Basket entry changes the grid connection's sensors, such as
    adding a PV source or an export counter later: the loads, the entity IDs and the history
    stay, and the sensors of a source you remove go with it. The region cannot change.
@@ -110,10 +112,20 @@ off, the load can still start, but the loads after it may use its budget. Withou
 reservation lasts the load's reaction time. So a car that is not plugged in does not keep
 a boiler after it out all day.
 
-Add only loads that follow their **Allowed
-power**: a load that keeps drawing on top of it takes budget the others were promised.
-Consumers you cannot steer are part of the **house**: the load that is always there and that
-Peak Basket does not steer.
+Steer only loads that follow their **Allowed power**: a load that keeps drawing on top of
+it takes budget the others were promised.
+
+A consumer you cannot steer, such as a heat pump that reports its power but cannot follow
+an allowed power, can still be added with **Steer this load** off: it is then **only
+measured**. You only give its name, power sensor and priority, and it gets only **Grid
+import** and **Solar import** (with solar power), so you see its share of the basket. For
+the steered loads it counts as house, wherever its priority puts it: it does not yield and
+never reserves budget. Solar goes to the steered loads first, then to the loads only
+measured (in priority order), then to the house. Turn **Steer this load** on later with
+**Reconfigure**: the steering sensors are added and the entity IDs stay.
+
+Consumers you do not add at all are part of the **house**: everything the connection uses
+that Peak Basket does not measure separately.
 
 ## Sensors
 

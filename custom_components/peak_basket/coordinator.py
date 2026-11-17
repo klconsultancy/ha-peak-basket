@@ -47,6 +47,7 @@ from .const import (
     CONF_PROFILE,
     CONF_PV_POWER,
     CONF_REACTION,
+    CONF_STEER,
     CONF_WINDOW_AVERAGE,
     DEFAULT_ENTRY_OPTIONS,
     DEFAULT_LOAD,
@@ -92,7 +93,7 @@ def floor_power(value: float) -> float:
 
 @dataclass(frozen=True)
 class Load:
-    """A controllable load: a subentry of the grid connection."""
+    """A load: a subentry of the grid connection, steered or only measured."""
 
     subentry_id: str
     title: str
@@ -102,6 +103,8 @@ class Load:
     """On while the load wants power (plugged in, calling for heat); None when unknown."""
     priority: float
     params: ModelParams
+    steered: bool = True
+    """False for a load that is only measured: it counts as house for the steered loads."""
 
 
 @dataclass(frozen=True)
@@ -110,9 +113,9 @@ class Flows:
 
     The loads' grid and solar energy add up between evaluations. The house is the rest:
     the import the meter counted minus what the loads drew from the grid, so the two
-    always add up to the import. Solar goes to the loads first, in priority order, then
-    the house. A display convention: physically, and for the grid operator, it makes no
-    difference.
+    always add up to the import. Solar goes to the steered loads first, in priority order,
+    then the measured-only loads, then the house. A display convention: physically, and
+    for the grid operator, it makes no difference.
     """
 
     solar: float = 0.0
@@ -188,8 +191,10 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
                 for subentry in entry.subentries.values()
                 if subentry.subentry_type == SUBENTRY_LOAD
             ),
-            key=lambda load: (load.priority, load.title),
+            # The steered loads first: solar goes to them before the loads only measured.
+            key=lambda load: (not load.steered, load.priority, load.title),
         )
+        self.steered = [load for load in self.loads if load.steered]
         self.peak_goal_w = opts[CONF_PEAK_GOAL]
         self.target_w = self.peak_goal_w
         self._max_age = timedelta(seconds=opts[CONF_MAX_AGE])
@@ -295,7 +300,8 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
         )
         results: dict[str, ModelResult] = {}
         claimed = 0.0
-        for k, load in enumerate(self.loads):
+        # A load that is only measured is not taken out of the house a steered load sees.
+        for k, load in enumerate(self.steered):
             # Per phase: the load's voltage, then the meter's, then nominal (in the model).
             own = [self._number(e, now) for e in load.voltage_entities]
             voltages = [
@@ -310,7 +316,7 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
                     load_w=powers[k],
                     window_import_wh=used_wh,
                     voltages=voltages or None,
-                    other_loads_w=sum(powers[k + 1 :]),
+                    other_loads_w=sum(powers[k + 1 : len(self.steered)]),
                     reserved_w=claimed,
                 ),
                 self.profile,
@@ -607,6 +613,7 @@ def _load(subentry_id: str, title: str, data: Mapping[str, Any], margin_w: float
         voltage_entities=list(voltages),
         demand_entity=cfg.get(CONF_DEMAND) or None,
         priority=float(cfg[CONF_PRIORITY]),
+        steered=bool(cfg.get(CONF_STEER, True)),
         params=ModelParams(
             margin_w=margin_w,
             reaction_s=float(cfg[CONF_REACTION]),

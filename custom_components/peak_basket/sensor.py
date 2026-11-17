@@ -221,18 +221,22 @@ async def async_setup_entry(
     solar = CONF_PV_POWER in entry.data
     register = CONF_GRID_EXPORT_ENERGY in entry.data
     connection_sensors = [*CONNECTION_SENSORS, HOUSE_GRID]
-    load_sensors = [*LOAD_SENSORS, LOAD_GRID]
+    # Who drew from the basket, for every load; the decision only for a steered one.
+    imports = [LOAD_GRID, LOAD_SOLAR] if solar else [LOAD_GRID]
     if solar:
         connection_sensors += SOLAR
-        load_sensors.append(LOAD_SOLAR)
     if solar or register:
         connection_sensors.append(_export(from_register=register))
     # A source removed through Reconfigure takes its sensors with it, rather than leaving
     # them behind as unavailable.
-    expected = {f"{entry.entry_id}_{d.key}" for d in connection_sensors} | {
-        f"{entry.entry_id}_{load.subentry_id}_{d.key}"
+    load_sensors = {
+        load.subentry_id: [*LOAD_SENSORS, *imports] if load.steered else imports
         for load in coordinator.loads
-        for d in load_sensors
+    }
+    expected = {f"{entry.entry_id}_{d.key}" for d in connection_sensors} | {
+        f"{entry.entry_id}_{subentry_id}_{d.key}"
+        for subentry_id, descriptions in load_sensors.items()
+        for d in descriptions
     }
     registry = er.async_get(hass)
     for registered in er.async_entries_for_config_entry(registry, entry.entry_id):
@@ -241,7 +245,10 @@ async def async_setup_entry(
     async_add_entities(ConnectionSensor(coordinator, d, connection.id) for d in connection_sensors)
     for load in coordinator.loads:
         async_add_entities(
-            (LoadSensor(coordinator, load, d, connection.id) for d in load_sensors),
+            (
+                LoadSensor(coordinator, load, d, connection.id)
+                for d in load_sensors[load.subentry_id]
+            ),
             config_subentry_id=load.subentry_id,
         )
 
