@@ -286,8 +286,10 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
         meter = [self._number(e, now) for e in self._entities(CONF_METER_VOLTAGES)]
         # A load's power that is missing or too old counts as 0 W. Many sources only write
         # a change, so a load at rest goes stale; waiting for it would lock the load out.
-        # 0 W is the safe side: its share counts as house, which leaves less room.
-        powers = [self._power_w(load.power_entity, now) or 0.0 for load in self.loads]
+        # 0 W is the safe side: its share counts as house, which leaves less room. A load
+        # does not produce power, so a negative reading (a meter's standby offset) counts
+        # as 0 W too: the engine, the sums and the reserves then all see the same powers.
+        powers = [max(self._power_w(load.power_entity, now) or 0.0, 0.0) for load in self.loads]
 
         connection = evaluate(
             ModelInput(

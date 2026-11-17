@@ -156,6 +156,9 @@ when Home Assistant is away. Push adapters (a mapping from the advice to a `numb
   and waiting for a fresh value would lock it out: it would never start, so it would never
   report. 0 W is the safe side: the load's share counts as house, which leaves the load,
   and every other load, less room. Only the grid power and the used energy must be fresh.
+  A negative power (a meter's standby offset) counts as 0 W as well: a load does not
+  produce power, and so the engine, the connection's sums and the reserves see the same
+  powers.
 - **Phase voltages.** Per phase, the load's voltage, then the meter's, then 230 V. A
   voltage of 180 V or less counts as missing. They set the load's minimum (6 A) and maximum
   (16 A) power.

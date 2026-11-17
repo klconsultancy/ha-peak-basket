@@ -606,3 +606,27 @@ async def test_the_basket_stacks_up_when_solar_covers_part_of_a_measured_only_lo
     assert float(value(hass, "house_reserve")) == 0
     assert heat_pump_reserve == pytest.approx(1000 * 898 / 3600, abs=1)
     assert heat_pump_reserve + room == pytest.approx(float(value(hass, "remaining")), abs=2)
+
+
+async def test_a_negative_load_power_counts_as_zero(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    """A meter's standby offset of -100 W on the EV changes neither its decision nor the stack."""
+    hass.states.async_set("sensor.pv_power", "1000", {"unit_of_measurement": "W"})
+    entry, ev, heat_pump = await _with_heat_pump(hass, freezer, pv_power="sensor.pv_power")
+    keys = ("allowed_power", "grid_limit", "mode", "load_room")
+    freezer.move_to("2026-11-15T03:15:02+00:00")
+    _report(hass, 1000, 100.0, 0, 2000)
+    await tick(hass)
+    at_zero = {k: _load_value(hass, entry, ev, k) for k in keys}
+
+    freezer.move_to("2026-11-15T03:15:02+00:00")
+    _report(hass, 1000, 100.0, -100, 2000)
+    await tick(hass)
+    assert {k: _load_value(hass, entry, ev, k) for k in keys} == at_zero
+    heat_pump_reserve = float(_load_value(hass, entry, heat_pump, "load_reserve"))
+    room = float(_load_value(hass, entry, ev, "load_room"))
+    assert heat_pump_reserve == pytest.approx(1000 * 898 / 3600, abs=1)
+    assert float(value(hass, "house_reserve")) + heat_pump_reserve + room == pytest.approx(
+        float(value(hass, "remaining")), abs=2
+    )

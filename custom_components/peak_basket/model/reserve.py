@@ -34,17 +34,17 @@ def measured_reserves(
     """Reserve (Wh) per measured-only load, in the order given; None when unknown.
 
     ``connection`` is the basket with every load taken out of the house, ``grid_w`` the
-    grid power and ``steered_w`` the steered loads' power together.
+    grid power and ``steered_w`` the steered loads' power together. The powers are at
+    least 0: the coordinator reads a negative one as 0 W.
     """
     remaining_wh, house_reserve_wh = connection.remaining_wh, connection.house_reserve_wh
     if remaining_wh is None or house_reserve_wh is None or grid_w is None:
         return [None] * len(powers_w)
-    powers = [max(power, 0.0) for power in powers_w]
     beside_steered = max(max(grid_w, 0.0) - steered_w, 0.0)
-    share = beside_steered - max(beside_steered - sum(powers), 0.0)
+    share = beside_steered - max(beside_steered - sum(powers_w), 0.0)
     left = max(remaining_wh, 0.0) - house_reserve_wh
     reserves: list[float | None] = []
-    for power in powers:
+    for power in powers_w:
         from_grid = min(power, share)
         share -= from_grid
         reserve = min(from_grid * rest_s / SECONDS_PER_HOUR, left)
