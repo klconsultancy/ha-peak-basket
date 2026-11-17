@@ -207,8 +207,8 @@ take every load out of the house. Every load also publishes its power as the mod
 missing, stale or negative counts as 0 W.
 
 A **measured-only load** (*Steer this load* off) is not steered: it gets no allowed power,
-grid limit, mode, run minutes or budget, only its grid and solar import, so the basket's
-history shows its share, and an **expected import** (`load_reserve`, `model/reserve.py`):
+grid limit, mode, run minutes or budget, only its power, its grid and solar import, so the
+basket's history shows its share, and an **expected import** (`load_reserve`, `model/reserve.py`):
 its grid share times the time left, out of what remains after the house's expected import,
 in priority order. Only grid
 import comes out of the basket, so the measured loads together project the difference
