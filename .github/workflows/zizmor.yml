@@ -15,4 +15,4 @@ jobs:
   zizmor:
     permissions:
       contents: read
-    uses: klconsultancy/workflows/.github/workflows/zizmor.yml@6d3966cda724c8842fd2185f372eacc6c6c2474e # main
+    uses: klconsultancy/workflows/.github/workflows/zizmor.yml@e6939b6be36b833baf87de0ce25c0ff4cac96b2f # v1.0.0
