@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pytest
-from homeassistant.config_entries import SOURCE_USER
+from homeassistant.config_entries import SOURCE_RECONFIGURE, SOURCE_USER
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -30,6 +30,7 @@ async def _add_boiler(hass: HomeAssistant, entry: ConfigEntry, priority: int) ->
     result = await hass.config_entries.subentries.async_configure(
         result["flow_id"], {"name": "Boiler", "load_power": BOILER, "priority": priority}
     )
+    await hass.config_entries.subentries.async_configure(result["flow_id"], {})
     await hass.async_block_till_done()
     return next(s.subentry_id for s in entry.subentries.values() if s.title == "Boiler")
 
@@ -413,3 +414,219 @@ async def test_a_load_with_demand_claims_until_it_draws(
     await _idle_at(hass, freezer, "2026-11-15T03:20:00+00:00")  # well past the reaction time
     car_allowed = float(_load_value(hass, entry, car, "allowed_power"))
     assert _boiler_sees(hass, entry, boiler) == pytest.approx(1000 + car_allowed, abs=20)
+
+
+HEAT_PUMP = "sensor.heat_pump_power"
+
+
+async def _add_heat_pump(hass: HomeAssistant, entry: ConfigEntry, priority: int = 0) -> str:
+    """Add a heat pump that is only measured: Peak Basket does not steer it."""
+    result = await hass.config_entries.subentries.async_init(
+        (entry.entry_id, "load"), context={"source": SOURCE_USER}
+    )
+    await hass.config_entries.subentries.async_configure(
+        result["flow_id"],
+        {"name": "Heat pump", "load_power": HEAT_PUMP, "priority": priority, "steer": False},
+    )
+    await hass.async_block_till_done()
+    return next(s.subentry_id for s in entry.subentries.values() if s.title == "Heat pump")
+
+
+def _report(
+    hass: HomeAssistant, grid_w: float, import_kwh: float, ev_w: float, hp_w: float
+) -> None:
+    set_sources(hass, grid_w, import_kwh, ev_w)
+    hass.states.async_set(HEAT_PUMP, str(hp_w), {"unit_of_measurement": "W"})
+
+
+async def test_a_measured_only_load_counts_as_house_for_the_others(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    """House 1000 W, heat pump 2000 W, EV 4140 W: the EV sees 3000 W of house either way."""
+    freezer.move_to("2026-11-15T03:14:59+00:00")
+    _report(hass, 7140, 100.0, 4140, 2000)
+    entry = await setup_entry(hass)
+    freezer.move_to("2026-11-15T03:15:01+00:00")
+    _report(hass, 7140, 100.0, 4140, 2000)
+    await tick(hass)
+    without = {k: value(hass, k) for k in ("allowed_power", "grid_limit", "mode")}
+
+    # After the EV in priority, it still does not yield to it.
+    await _add_heat_pump(hass, entry, priority=2)
+    # The reload loses the import counter's start: compare at the same point of the next window.
+    freezer.move_to("2026-11-15T03:30:01+00:00")
+    _report(hass, 7140, 100.0, 4140, 2000)
+    await tick(hass)
+    assert {k: value(hass, k) for k in without} == without
+
+
+async def _with_heat_pump(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory, **sources: str
+) -> tuple[ConfigEntry, str, str]:
+    """House 1000 W, EV 4140 W and a measured heat pump 2000 W, 1 s into a fresh window."""
+    freezer.move_to("2026-11-15T03:14:59+00:00")
+    _report(hass, 7140, 100.0, 4140, 2000)
+    entry = await setup_entry(hass, {**SOURCES, **sources})
+    heat_pump = await _add_heat_pump(hass, entry, priority=0)
+    (ev,) = (s.subentry_id for s in entry.subentries.values() if s.title != "Heat pump")
+    freezer.move_to("2026-11-15T03:15:01+00:00")
+    _report(hass, 7140, 100.0, 4140, 2000)
+    await tick(hass)
+    return entry, ev, heat_pump
+
+
+def _load_keys(hass: HomeAssistant, entry: ConfigEntry, subentry_id: str) -> set[str]:
+    prefix = f"{entry.entry_id}_{subentry_id}_"
+    return {
+        e.unique_id.removeprefix(prefix)
+        for e in er.async_entries_for_config_entry(er.async_get(hass), entry.entry_id)
+        if e.unique_id.startswith(prefix)
+    }
+
+
+async def test_a_measured_only_load_has_only_its_import_sensors(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    hass.states.async_set("sensor.pv_power", "0", {"unit_of_measurement": "W"})
+    entry, _, heat_pump = await _with_heat_pump(hass, freezer, pv_power="sensor.pv_power")
+    assert _load_keys(hass, entry, heat_pump) == {"load_grid", "load_solar", "load_reserve"}
+
+
+async def test_the_basket_stacks_up_with_a_measured_only_load(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    """House reserve, the heat pump's reserve and the EV's room: what remains."""
+    entry, ev, heat_pump = await _with_heat_pump(hass, freezer)
+    house_reserve = float(value(hass, "house_reserve"))
+    heat_pump_reserve = float(_load_value(hass, entry, heat_pump, "load_reserve"))
+    room = float(_load_value(hass, entry, ev, "load_room"))
+    assert heat_pump_reserve == pytest.approx(2000 * 899 / 3600, abs=1)
+    assert house_reserve + heat_pump_reserve + room == pytest.approx(
+        float(value(hass, "remaining")), abs=2
+    )
+
+
+async def test_who_drew_from_the_grid_adds_up_with_a_measured_only_load(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    entry, ev, heat_pump = await _with_heat_pump(hass, freezer)
+    freezer.move_to("2026-11-15T03:16:01+00:00")
+    _report(hass, 7140, 100.119, 4140, 2000)  # 7140 W for 60 s: 119 Wh
+    await tick(hass)
+    heat_pump_grid = float(_load_value(hass, entry, heat_pump, "load_grid"))
+    ev_grid = float(_load_value(hass, entry, ev, "load_grid"))
+    house_grid = float(value(hass, "house_grid"))
+    assert heat_pump_grid == pytest.approx(2000 * 61 / 3600, abs=1)
+    assert heat_pump_grid + ev_grid + house_grid == pytest.approx(float(value(hass, "used")), abs=1)
+    # The house is what neither load drew: the heat pump is out of it.
+    assert float(value(hass, "house_power")) == 1000
+
+
+async def test_solar_goes_to_the_steered_loads_before_a_measured_only_one(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    """The heat pump goes first in priority, but solar covers the EV first."""
+    hass.states.async_set("sensor.pv_power", "3000", {"unit_of_measurement": "W"})
+    entry, ev, heat_pump = await _with_heat_pump(hass, freezer, pv_power="sensor.pv_power")
+    freezer.move_to("2026-11-15T03:16:01+00:00")
+    _report(hass, 4140, 100.069, 4140, 2000)  # 4140 W for 60 s: 69 Wh
+    hass.states.async_set("sensor.pv_power", "3000", {"unit_of_measurement": "W"})
+    await tick(hass)
+    assert float(_load_value(hass, entry, ev, "load_solar")) == pytest.approx(3000 / 60, abs=1)
+    assert float(_load_value(hass, entry, heat_pump, "load_solar")) == 0
+
+
+async def _reconfigure_load(
+    hass: HomeAssistant, entry: ConfigEntry, subentry_id: str, *, steer: bool
+) -> None:
+    subentry = entry.subentries[subentry_id]
+    result = await hass.config_entries.subentries.async_init(
+        (entry.entry_id, "load"),
+        context={"source": SOURCE_RECONFIGURE, "subentry_id": subentry_id},
+    )
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"],
+        {
+            "name": subentry.title,
+            "load_power": subentry.data["load_power"],
+            "priority": subentry.data["priority"],
+            "steer": steer,
+        },
+    )
+    if steer:
+        assert result["step_id"] == "reconfigure_steering"
+        result = await hass.config_entries.subentries.async_configure(result["flow_id"], {})
+    assert result["reason"] == "reconfigure_successful"
+    await hass.async_block_till_done()
+
+
+def _entity_ids(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, str]:
+    return {
+        e.unique_id: e.entity_id
+        for e in er.async_entries_for_config_entry(er.async_get(hass), entry.entry_id)
+    }
+
+
+async def test_steering_a_measured_only_load_later_keeps_its_entity_ids(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    entry, _, heat_pump = await _with_heat_pump(hass, freezer)
+    before = _entity_ids(hass, entry)
+
+    await _reconfigure_load(hass, entry, heat_pump, steer=True)
+    assert entry.subentries[heat_pump].data["steer"] is True
+    assert _load_keys(hass, entry, heat_pump) >= {"allowed_power", "grid_limit", "mode"}
+    # A steered load's share is in its room, not in a reserve of its own.
+    assert "load_reserve" not in _load_keys(hass, entry, heat_pump)
+    after = _entity_ids(hass, entry)
+    kept = {k: v for k, v in before.items() if not k.endswith("_load_reserve")}
+    assert {k: v for k, v in after.items() if k in before} == kept
+
+    await _reconfigure_load(hass, entry, heat_pump, steer=False)
+    assert dict(entry.subentries[heat_pump].data) == {
+        "load_power": HEAT_PUMP,
+        "priority": 0,
+        "steer": False,
+    }
+    assert _load_keys(hass, entry, heat_pump) == {"load_grid", "load_reserve"}
+    assert _entity_ids(hass, entry) == before
+
+
+async def test_the_basket_stacks_up_when_solar_covers_part_of_a_measured_only_load(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    """Grid 1000 W, heat pump 2000 W, EV idle: solar gives the heat pump the other 1000 W."""
+    hass.states.async_set("sensor.pv_power", "1000", {"unit_of_measurement": "W"})
+    entry, ev, heat_pump = await _with_heat_pump(hass, freezer, pv_power="sensor.pv_power")
+    freezer.move_to("2026-11-15T03:15:02+00:00")
+    _report(hass, 1000, 100.0, 0, 2000)
+    await tick(hass)
+    heat_pump_reserve = float(_load_value(hass, entry, heat_pump, "load_reserve"))
+    room = float(_load_value(hass, entry, ev, "load_room"))
+    assert float(value(hass, "house_reserve")) == 0
+    assert heat_pump_reserve == pytest.approx(1000 * 898 / 3600, abs=1)
+    assert heat_pump_reserve + room == pytest.approx(float(value(hass, "remaining")), abs=2)
+
+
+async def test_a_negative_load_power_counts_as_zero(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    """A meter's standby offset of -100 W on the EV changes neither its decision nor the stack."""
+    hass.states.async_set("sensor.pv_power", "1000", {"unit_of_measurement": "W"})
+    entry, ev, heat_pump = await _with_heat_pump(hass, freezer, pv_power="sensor.pv_power")
+    keys = ("allowed_power", "grid_limit", "mode", "load_room")
+    freezer.move_to("2026-11-15T03:15:02+00:00")
+    _report(hass, 1000, 100.0, 0, 2000)
+    await tick(hass)
+    at_zero = {k: _load_value(hass, entry, ev, k) for k in keys}
+
+    freezer.move_to("2026-11-15T03:15:02+00:00")
+    _report(hass, 1000, 100.0, -100, 2000)
+    await tick(hass)
+    assert {k: _load_value(hass, entry, ev, k) for k in keys} == at_zero
+    heat_pump_reserve = float(_load_value(hass, entry, heat_pump, "load_reserve"))
+    room = float(_load_value(hass, entry, ev, "load_room"))
+    assert heat_pump_reserve == pytest.approx(1000 * 898 / 3600, abs=1)
+    assert float(value(hass, "house_reserve")) + heat_pump_reserve + room == pytest.approx(
+        float(value(hass, "remaining")), abs=2
+    )

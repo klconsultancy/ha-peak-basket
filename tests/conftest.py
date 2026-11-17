@@ -33,17 +33,9 @@ SOURCES: dict[str, Any] = {
     "load_power": EV,
 }
 # What the config flow asks in its second step, for the first load.
-LOAD_FIELDS = {
-    "load_power",
-    "voltages",
-    "priority",
-    "min_a",
-    "max_a",
-    "reaction_s",
-    "min_charge_s",
-    "extra_a",
-    "demand",
-}
+LOAD_FIELDS = {"load_power", "priority", "steer"}
+# And in its third, when the load is steered.
+STEERING_FIELDS = {"voltages", "min_a", "max_a", "reaction_s", "min_charge_s", "extra_a", "demand"}
 LOAD_KEYS = {
     "allowed_power",
     "grid_limit",
@@ -97,13 +89,15 @@ async def tick(hass: HomeAssistant) -> None:
 async def setup_entry(hass: HomeAssistant, sources: dict[str, Any] | None = None) -> ConfigEntry:
     """Add an entry and its first load through the config flow, and wait for its sensors.
 
-    ``sources`` holds the fields of both steps: the load's go to the second.
+    ``sources`` holds the fields of every step: the load's go to the second, its steering
+    to the third.
     """
     fields = SOURCES if sources is None else sources
     result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
     assert result["type"] is FlowResultType.FORM
     result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {k: v for k, v in fields.items() if k not in LOAD_FIELDS}
+        result["flow_id"],
+        {k: v for k, v in fields.items() if k not in LOAD_FIELDS | STEERING_FIELDS},
     )
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "load"
@@ -111,6 +105,12 @@ async def setup_entry(hass: HomeAssistant, sources: dict[str, Any] | None = None
         result["flow_id"],
         {"name": LOAD_NAME} | {k: v for k, v in fields.items() if k in LOAD_FIELDS},
     )
+    if fields.get("steer", True):
+        assert result["type"] is FlowResultType.FORM
+        assert result["step_id"] == "load_steering"
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {k: v for k, v in fields.items() if k in STEERING_FIELDS}
+        )
     assert result["type"] is FlowResultType.CREATE_ENTRY
     await hass.async_block_till_done()
     entry: ConfigEntry = result["result"]

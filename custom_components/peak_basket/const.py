@@ -32,6 +32,7 @@ DEFAULT_ENTRY_OPTIONS: dict[str, float] = {
 
 # Load subentry data
 CONF_LOAD_POWER = "load_power"
+CONF_STEER = "steer"
 CONF_LOAD_VOLTAGES = "voltages"
 CONF_DEMAND = "demand"
 CONF_PRIORITY = "priority"

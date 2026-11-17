@@ -37,7 +37,7 @@ async def test_creates_the_connection_with_its_first_load(hass: HomeAssistant) -
     (load,) = entry.subentries.values()
     assert load.subentry_type == "load"
     assert load.title == LOAD_NAME
-    assert dict(load.data) == {"load_power": EV, **DEFAULT_LOAD}
+    assert dict(load.data) == {"load_power": EV, "steer": True, **DEFAULT_LOAD}
 
 
 async def test_requires_an_energy_source(hass: HomeAssistant) -> None:
@@ -89,8 +89,13 @@ async def test_add_a_load(hass: HomeAssistant) -> None:
     )
     assert result["type"] is FlowResultType.FORM
     result = await hass.config_entries.subentries.async_configure(
-        result["flow_id"],
-        {"name": "Boiler", "load_power": "sensor.boiler_power", "priority": 2, "max_a": 10.0},
+        result["flow_id"], {"name": "Boiler", "load_power": "sensor.boiler_power", "priority": 2}
+    )
+    # Steered by default: the steering comes in a step of its own.
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "steering"
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"], {"max_a": 10.0}
     )
     assert result["type"] is FlowResultType.CREATE_ENTRY
     await hass.async_block_till_done()
@@ -130,7 +135,11 @@ async def test_reconfigure_a_load(hass: HomeAssistant) -> None:
     )
     assert result["errors"] == {"load_power": "same_as_grid"}
     result = await hass.config_entries.subentries.async_configure(
-        result["flow_id"], {"name": "Car", "load_power": EV, "reaction_s": 30.0}
+        result["flow_id"], {"name": "Car", "load_power": EV}
+    )
+    assert result["step_id"] == "reconfigure_steering"
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"], {"reaction_s": 30.0}
     )
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "reconfigure_successful"
@@ -212,9 +221,34 @@ async def test_reconfigure_refuses_what_setup_refuses(hass: HomeAssistant) -> No
     assert result["errors"] == {"grid_power": "grid_is_a_load"}
 
 
-def test_demand_comes_right_after_priority() -> None:
-    """It only means something together with the priority, so it sits next to it."""
-    from custom_components.peak_basket.config_flow import LOAD_SCHEMA  # noqa: PLC0415
+def test_demand_comes_first_in_the_steering() -> None:
+    """It only means something together with the priority, so it comes right after it."""
+    from custom_components.peak_basket.config_flow import STEERING_SCHEMA  # noqa: PLC0415
 
-    keys = [str(key) for key in LOAD_SCHEMA.schema]
-    assert keys.index("demand") == keys.index("priority") + 1
+    keys = [str(key) for key in STEERING_SCHEMA.schema]
+    assert keys[0] == "demand"
+
+
+async def test_add_a_measured_only_load_asks_only_name_power_and_priority(
+    hass: HomeAssistant,
+) -> None:
+    set_sources(hass, 1000, 100.0, 0)
+    entry = await setup_entry(hass)
+    result = await hass.config_entries.subentries.async_init(
+        (entry.entry_id, "load"), context={"source": SOURCE_USER}
+    )
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"],
+        {"name": "Heat pump", "load_power": "sensor.hp_power", "priority": 3, "steer": False},
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    heat_pump = next(s for s in entry.subentries.values() if s.title == "Heat pump")
+    assert dict(heat_pump.data) == {"load_power": "sensor.hp_power", "priority": 3, "steer": False}
+
+
+async def test_the_first_load_can_be_measured_only(hass: HomeAssistant) -> None:
+    set_sources(hass, 1000, 100.0, 0)
+    entry = await setup_entry(hass, {**SOURCES, "priority": 1, "steer": False})
+    (load,) = entry.subentries.values()
+    assert dict(load.data) == {"load_power": EV, "priority": 1, "steer": False}
+    assert entry.runtime_data.data.loads == {}

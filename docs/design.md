@@ -45,8 +45,11 @@ the bill and not handled here.
 
 ### Solar attribution
 
-For display only, solar self-consumption goes to the controllable loads first, in priority
-order, and the rest to the house (`model/solar.py`). Then the house carries most of the
+For display only, solar self-consumption goes to the steered loads first, in priority
+order, then to the measured-only loads, in priority order, and the rest to the house
+(`model/solar.py`, called with the loads in that order). A measured-only load comes after
+every steered one, so adding one changes nothing a steered load shows, just as it changes
+nothing the steered loads decide. Then the house carries most of the
 grid import, and you see how much the flexible loads leaned on the basket. Physically, and
 for the grid operator, it makes no difference.
 
@@ -94,7 +97,7 @@ from other integrations, and everything it decides is published as entities.
 | | |
 |---|---|
 | Entry | One grid connection: grid power, the window average or the import register, optionally the monthly peak and the meter's phase voltages; the peak goal, margin and maximum source age |
-| Subentries | One per controllable load: its power sensor, optionally its phase voltages, its priority, current range, reaction time and minimum run time |
+| Subentries | One per load: its power sensor, its priority and whether it is steered; for a steered load, optionally its phase voltages, and its current range, reaction time and minimum run time |
 | Output | The connection's device: target peak, the basket fields, solar and export. The house's device, under it: house power, house reserve and the house's grid and solar import. Each load's device: its allowed power, grid limit, mode, run minutes, budget left and its grid and solar import. The UI names are in [`CONTEXT.md`](../CONTEXT.md) |
 | Manifest | `iot_class: calculated`, `integration_type: service` (an integration card with its own device), no requirements, no credentials |
 
@@ -105,9 +108,10 @@ so they are the same in every language; a load's sensors follow the load's name.
 
 **Loads follow their allowed power.** A load's grid limit counts on the loads after it
 to yield and on the load itself to stay within its allowed power. A load that ignores it
-draws on top of the budget for the whole window. Add only loads that something drives
-from their allowed power (EVCC, an automation, a push adapter later); measure any other
-consumer, such as a heat pump you only want to watch, as house.
+draws on top of the budget for the whole window. Steer only loads that something drives
+from their allowed power (EVCC, an automation, a push adapter later). Any other consumer,
+such as a heat pump you only want to watch, is a **measured-only load** (see
+[Several loads](#several-loads)), or simply part of the house.
 
 **Pull first.** The load's allowed power, and the total grid limit, are sensors that any
 system reads itself: EVCC (a circuit's dynamic limit from Home Assistant), Node-RED, an
@@ -152,6 +156,9 @@ when Home Assistant is away. Push adapters (a mapping from the advice to a `numb
   and waiting for a fresh value would lock it out: it would never start, so it would never
   report. 0 W is the safe side: the load's share counts as house, which leaves the load,
   and every other load, less room. Only the grid power and the used energy must be fresh.
+  A negative power (a meter's standby offset) counts as 0 W as well: a load does not
+  produce power, and so the engine, the connection's sums and the reserves see the same
+  powers.
 - **Phase voltages.** Per phase, the load's voltage, then the meter's, then 230 V. A
   voltage of 180 V or less counts as missing. They set the load's minimum (6 A) and maximum
   (16 A) power.
@@ -183,6 +190,23 @@ is unknown counts as 0 W, see below.
 
 The connection's own figures (house power, used, remaining, house reserve) take every
 load out of the house.
+
+A **measured-only load** (*Steer this load* off) is not steered: it gets no allowed power,
+grid limit, mode, run minutes or budget, only its grid and solar import, so the basket's
+history shows its share, and a **reserve** (`model/reserve.py`): its grid share times the
+time left, out of what remains after the house reserve, in priority order. Only grid
+import comes out of the basket, so the measured loads together project the difference
+between the first steered load's house (`grid − Σ steered`) and the connection's
+(`grid − Σ all loads`), each at least 0: their power without solar, less when solar
+covers part of them. Each gets at most its own power. A steered load's
+room already leaves that out (the load is house to it), but the connection's house
+reserve does not hold it, so without it the stack house reserve + load room would stop
+short of what remains by the measured loads' expected use. For every steered load it is house, whatever its priority: it
+does not yield, and it never claims. Its priority only orders the measured-only loads
+among themselves for the solar attribution. The connection's figures take it out of the
+house like any load. Its subentry holds only its power sensor and priority; steering it
+later through Reconfigure adds the steering sensors next to the import sensors, under the
+same unique IDs, so the entity IDs stay; its reserve goes, since its room then covers it.
 
 ## The model
 

@@ -30,14 +30,26 @@ import counter, monthly peak, meter voltages) and its tunables (peak goal, margi
 source age) belong to it.
 
 **House** (*House*, *Huis*)
-: The default load: everything the connection uses that Peak Basket does not steer, the
-grid import minus the power of every load. It has its own device under the connection's,
+: The default load: everything the connection uses that Peak Basket does not measure as a
+load, the grid import minus the power of every load, measured-only loads included. It has its own device under the connection's,
 but no subentry: it cannot be removed and needs no configuration.
 
 **Load** (*Afnemer* in Dutch)
-: A controllable consumer, such as an EV charger, a boiler or a battery charging: a
-subentry of the grid connection, with its own device and sensors. Its power sensor,
-phase voltages, current range, reaction time and minimum run time belong to it.
+: A consumer Peak Basket measures, such as an EV charger, a boiler, a heat pump or a battery
+charging: a subentry of the grid connection, with its own device and sensors. Its power
+sensor and priority belong to it, and, when steered, its phase voltages, current range,
+reaction time and minimum run time. A load is steered or only measured.
+
+**Steered load** (*Steer this load* on, *Deze afnemer sturen*)
+: A load that follows its allowed power. It goes through the basket in priority order and
+has the decision's sensors (allowed power, grid limit, mode, ...).
+
+**Measured-only load** (*Steer this load* off)
+: A load Peak Basket only measures, such as a heat pump that cannot follow an allowed power.
+It counts as house for every steered load, never claims, and has only its grid and solar
+import and a reserve: its grid share until the window ends, out of what the house leaves, so
+the house reserve, the measured reserves and the first steered load's room add up to what
+remains. Its priority only orders the measured-only loads among themselves for solar. Solar goes to it after the steered loads, before the house.
 
 **Priority**
 : The order loads go in, lower first. A load counts the loads before it as house, and the
