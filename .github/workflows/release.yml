@@ -2,79 +2,49 @@ name: Release
 
 # release-please keeps a release pull request open with the next version and its changelog,
 # from the Conventional Commits titles on main. Merging it tags the release and creates the
-# GitHub Release HACS installs from.
+# GitHub Release HACS installs from. Both run in the organization's reusable workflow, as
+# the release app.
 #
 # A release candidate is a tag such as v0.3.0-rc.1 on main, pushed by an admin (the
-# "release tags" ruleset): it becomes a GitHub pre-release, which HACS offers to users who
-# enabled beta versions. release-please doesn't see it, so the final release's notes still
-# cover everything since the last stable release.
+# "release tags" ruleset): the reusable workflow turns it into a GitHub pre-release, which
+# HACS offers to users who enabled beta versions. release-please doesn't see it, so the
+# final release's notes still cover everything since the last stable release.
 on:
   push:
     branches: [main]
     tags: ["v[0-9]+.[0-9]+.[0-9]+-rc.[0-9]+"]
 
-permissions:
-  contents: read
+permissions: {}
 
 jobs:
-  release-please:
-    name: Release PR
-    if: github.ref_type == 'branch'
+  release:
+    permissions: {} # both jobs act as the app
+    uses: klconsultancy/workflows/.github/workflows/release-please.yml@c9502596494c47704b890d5cc66de73c06ba93d8 # main
+    with:
+      app-client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+      release-candidates: true
+    secrets:
+      RELEASE_APP_PRIVATE_KEY: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
+  # HACS installs peak_basket.zip (hacs.json), with the version set to the tag's: on the
+  # release that merging the release PR creates, and on a release candidate's pre-release.
+  zip:
+    name: Release zip
+    needs: release
+    if: needs.release.outputs.release_created == 'true' || github.ref_type == 'tag'
     runs-on: ubuntu-latest
     permissions:
       contents: write # the zip on the release
     steps:
-      # A GitHub App token instead of GITHUB_TOKEN, so CI runs on the release PR.
-      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
-        id: app-token
-        with:
-          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
-          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
-      # HACS installs from the GitHub Release that merging the release PR creates.
-      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
-        id: release
-        with:
-          token: ${{ steps.app-token.outputs.token }}
-      # HACS installs peak_basket.zip (hacs.json), with the version set to the tag's.
-      - if: steps.release.outputs.release_created
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ steps.release.outputs.tag_name }}
-          persist-credentials: false
-      - if: steps.release.outputs.release_created
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ steps.release.outputs.tag_name }}
-        run: |
-          python3 -m script.release_zip "$TAG" peak_basket.zip
-          # A release without its zip is one HACS cannot install: retry, then check.
-          for attempt in 1 2 3; do
-            gh release upload "$TAG" peak_basket.zip --repo "$GITHUB_REPOSITORY" --clobber && break
-            echo "Upload attempt $attempt failed."
-            sleep 10
-          done
-          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' \
-            | grep -qx peak_basket.zip \
-            || { echo "::error::$TAG has no peak_basket.zip: HACS cannot install it"; exit 1; }
-
-  release-candidate:
-    name: Release candidate
-    if: github.ref_type == 'tag'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write # the pre-release
-    steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          # On a tag push the outputs are empty: the tag is the pushed ref.
+          ref: ${{ needs.release.outputs.tag_name || github.ref_name }}
           persist-credentials: false
       - env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ needs.release.outputs.tag_name || github.ref_name }}
         run: |
-          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --prerelease --generate-notes --title "$TAG"
-          fi
-          # HACS installs peak_basket.zip (hacs.json), with the version set to the tag's.
           python3 -m script.release_zip "$TAG" peak_basket.zip
           # A release without its zip is one HACS cannot install: retry, then check.
           for attempt in 1 2 3; do
