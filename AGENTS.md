@@ -26,7 +26,9 @@ for the design and [`CONTEXT.md`](CONTEXT.md) for terms before changing code.
   be deleted by hand. Every release gets
   `peak_basket.zip` (`script/release_zip.py`), which HACS installs (`hacs.json`): the
   integration with `manifest.json`'s version set to the tag's, because on `main` it still
-  has the last release's. Never make one with
+  has the last release's. Releases are immutable once published, so the release workflow
+  keeps each release and pre-release a draft until the zip is attached, then publishes it
+  (`draft` and `force-tag-creation` in `release-please-config.json`). Never make one with
   `release-as` and `prerelease` in `release-please-config.json`: release-please would count
   the rc as the last release, and the final release's notes would leave out what the rc
   had. Before merging a release PR, check that its notes cover everything since the last
