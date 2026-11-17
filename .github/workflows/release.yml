@@ -17,41 +17,16 @@ on:
 permissions: {}
 
 jobs:
+  # HACS installs peak_basket.zip (hacs.json), with the version set to the tag's. The
+  # reusable workflow builds it and attaches it to the release that merging the release PR
+  # creates, and to a release candidate's pre-release.
   release:
-    permissions: {} # both jobs act as the app
-    uses: klconsultancy/workflows/.github/workflows/release-please.yml@c9502596494c47704b890d5cc66de73c06ba93d8 # main
+    permissions: {} # every job acts as the app
+    uses: klconsultancy/workflows/.github/workflows/release-please.yml@6d3966cda724c8842fd2185f372eacc6c6c2474e # main
     with:
       app-client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
       release-candidates: true
+      assets-command: python3 -m script.release_zip "$TAG" peak_basket.zip
+      assets: peak_basket.zip
     secrets:
       RELEASE_APP_PRIVATE_KEY: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
-
-  # HACS installs peak_basket.zip (hacs.json), with the version set to the tag's: on the
-  # release that merging the release PR creates, and on a release candidate's pre-release.
-  zip:
-    name: Release zip
-    needs: release
-    if: needs.release.outputs.release_created == 'true' || github.ref_type == 'tag'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write # the zip on the release
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          # On a tag push the outputs are empty: the tag is the pushed ref.
-          ref: ${{ needs.release.outputs.tag_name || github.ref_name }}
-          persist-credentials: false
-      - env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ needs.release.outputs.tag_name || github.ref_name }}
-        run: |
-          python3 -m script.release_zip "$TAG" peak_basket.zip
-          # A release without its zip is one HACS cannot install: retry, then check.
-          for attempt in 1 2 3; do
-            gh release upload "$TAG" peak_basket.zip --repo "$GITHUB_REPOSITORY" --clobber && break
-            echo "Upload attempt $attempt failed."
-            sleep 10
-          done
-          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' \
-            | grep -qx peak_basket.zip \
-            || { echo "::error::$TAG has no peak_basket.zip: HACS cannot install it"; exit 1; }

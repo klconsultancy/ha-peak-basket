@@ -23,7 +23,7 @@ jobs:
   python:
     permissions:
       contents: read
-    uses: klconsultancy/workflows/.github/workflows/python-uv.yml@c9502596494c47704b890d5cc66de73c06ba93d8 # main
+    uses: klconsultancy/workflows/.github/workflows/python-uv.yml@6d3966cda724c8842fd2185f372eacc6c6c2474e # main
     with:
       python-version: "3.14" # same as the devcontainer
       test-python-versions: '["3.14"]'
@@ -32,7 +32,7 @@ jobs:
   home-assistant:
     permissions:
       contents: read
-    uses: klconsultancy/workflows/.github/workflows/home-assistant.yml@c9502596494c47704b890d5cc66de73c06ba93d8 # main
+    uses: klconsultancy/workflows/.github/workflows/home-assistant.yml@6d3966cda724c8842fd2185f372eacc6c6c2474e # main
 
   dependency-review:
     name: Dependency review

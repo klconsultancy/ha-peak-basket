@@ -20,8 +20,10 @@ for the design and [`CONTEXT.md`](CONTEXT.md) for terms before changing code.
   other. A workflow that gives a required check must also run on `merge_group`.
 - PR titles and squash commits follow Conventional Commits (`feat:`, `fix:`, `docs:`,
   `test:`, `refactor:`, `build:`, `ci:`, `chore:`). They drive release-please.
-- A release candidate is a tag `vX.Y.Z-rc.N` on `main`, pushed by an admin; the release
-  workflow makes it a GitHub pre-release, which HACS offers as a beta. Every release gets
+- A release candidate is a tag `vX.Y.Z-rc.N` on `main`, pushed by an admin while
+  release-please's release PR for `X.Y.Z` is open; the release workflow makes it a GitHub
+  pre-release, which HACS offers as a beta. Any other rc tag fails the workflow and has to
+  be deleted by hand. Every release gets
   `peak_basket.zip` (`script/release_zip.py`), which HACS installs (`hacs.json`): the
   integration with `manifest.json`'s version set to the tag's, because on `main` it still
   has the last release's. Never make one with
