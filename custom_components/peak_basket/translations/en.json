@@ -21,7 +21,7 @@
           "window_average": "The meter's running average over the current window (e.g. HomeWizard “average demand”, DSMR 1.4.0). It must average over the region's window (15 minutes in Flanders) and drop back to about 0 at every window start; a 5-minute average or an hourly one gives a wrong budget. Preferred over the import counter: exact, also right after a restart.",
           "grid_import_energy": "The total-increasing counter of imported energy (register 1.8.x). Used when no window average is set.",
           "grid_export_energy": "The total-increasing counter of exported energy (register 2.8.x). Gives the exact export per window; without it, export comes from a negative grid power.",
-          "month_peak": "The highest window average this month; the target peak never goes below it.",
+          "month_peak": "The highest window average this month; the peak limit never goes below it.",
           "meter_voltages": "Voltage per phase at the meter, in order L1, L2, L3. Used for every load whose own voltage is missing; otherwise 230 V is assumed."
         }
       },
@@ -78,7 +78,7 @@
           "window_average": "The meter's running average over the current window (e.g. HomeWizard “average demand”, DSMR 1.4.0). It must average over the region's window (15 minutes in Flanders) and drop back to about 0 at every window start; a 5-minute average or an hourly one gives a wrong budget. Preferred over the import counter: exact, also right after a restart.",
           "grid_import_energy": "The total-increasing counter of imported energy (register 1.8.x). Used when no window average is set.",
           "grid_export_energy": "The total-increasing counter of exported energy (register 2.8.x). Gives the exact export per window; without it, export comes from a negative grid power.",
-          "month_peak": "The highest window average this month; the target peak never goes below it.",
+          "month_peak": "The highest window average this month; the peak limit never goes below it.",
           "meter_voltages": "Voltage per phase at the meter, in order L1, L2, L3. Used for every load whose own voltage is missing; otherwise 230 V is assumed."
         }
       }
@@ -102,8 +102,8 @@
           "max_age_s": "Maximum age of a reading"
         },
         "data_description": {
-          "peak_goal_w": "The average power per window you allow. The target peak is the highest of this goal, the monthly peak and the region's minimum.",
-          "margin_w": "Left untouched in every window, to absorb measurement and timing errors.",
+          "peak_goal_w": "An average over the window: 5 500 W over 15 minutes is a window budget of 1 375 Wh. The peak limit is the highest of this goal, the monthly peak and the region's minimum.",
+          "margin_w": "Power kept free in every window, to absorb measurement and timing errors. Over the window it is the reserve: 100 W over 15 minutes is 25 Wh.",
           "max_age_s": "An older reading of the grid power, the window average or the import counter counts as missing and puts the loads in safe mode. A load or the inverter without a recent reading counts as 0 W."
         }
       }
@@ -204,6 +204,9 @@
   },
   "entity": {
     "sensor": {
+      "power": {
+        "name": "Power"
+      },
       "allowed_power": {
         "name": "Allowed power"
       },
@@ -223,16 +226,16 @@
         "name": "Run minutes left"
       },
       "load_room": {
-        "name": "Budget left"
+        "name": "Budget available"
       },
       "target": {
-        "name": "Target peak"
+        "name": "Peak limit"
       },
       "house_power": {
         "name": "Power"
       },
       "basket": {
-        "name": "Basket"
+        "name": "Window budget"
       },
       "used": {
         "name": "Grid import"
@@ -241,13 +244,13 @@
         "name": "Budget left"
       },
       "house_reserve": {
-        "name": "Reserve"
+        "name": "Expected import"
       },
       "load_reserve": {
-        "name": "Reserve"
+        "name": "Expected import"
       },
       "margin": {
-        "name": "Margin"
+        "name": "Reserve"
       },
       "solar": {
         "name": "Solar production"

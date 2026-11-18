@@ -18,6 +18,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util import slugify
 
 from .const import CONF_GRID_EXPORT_ENERGY, CONF_PV_POWER, DOMAIN
 from .coordinator import PeakBasketConfigEntry, PeakBasketCoordinator, floor_power
@@ -54,6 +55,38 @@ class LoadSensorDescription(SensorEntityDescription):
     """From the latest evaluation and the load's subentry id."""
     restore: bool = False
     """Hand the last value back to the coordinator after a restart, within its window."""
+
+
+# The entity ID's suffix per key: the slug of the sensor's English name, the same in every
+# language (tests/test_names.py holds it to strings.json).
+SUFFIXES = {
+    "basket": "window_budget",
+    "used": "grid_import",
+    "remaining": "budget_left",
+    "margin": "reserve",
+    "target": "peak_limit",
+    "solar": "solar_production",
+    "export": "export",
+    "house_power": "power",
+    "house_grid": "grid_import",
+    "house_solar": "solar_import",
+    "house_reserve": "expected_import",
+    "power": "power",
+    "allowed_power": "allowed_power",
+    "grid_limit": "grid_limit",
+    "mode": "mode",
+    "charge_minutes": "run_minutes_left",
+    "load_room": "budget_available",
+    "load_reserve": "expected_import",
+    "load_grid": "grid_import",
+    "load_solar": "solar_import",
+}
+
+
+def load_slug(title: str) -> str:
+    """Return the load's part of its entity IDs: never one the house's could have."""
+    slug = slugify(title)
+    return f"{slug}_load" if slug == "house" or slug.startswith("house_") else slug
 
 
 def _wh(value: float | None) -> float | None:
@@ -150,14 +183,23 @@ LOAD_SENSORS: tuple[LoadSensorDescription, ...] = (
 )
 
 
-# A measured-only load's share of what remains: the steered loads' room leaves it out.
+# Every load's power as the model uses it: missing, stale or negative is 0 W.
+LOAD_POWER = LoadSensorDescription(
+    key="power",
+    translation_key="power",
+    device_class=SensorDeviceClass.POWER,
+    native_unit_of_measurement=UnitOfPower.WATT,
+    state_class=SensorStateClass.MEASUREMENT,
+    value_fn=lambda d, i: _w(d.powers.get(i)),
+)
+
+# A measured-only load's expected import: its only basket figure, so not diagnostic.
 LOAD_RESERVE = LoadSensorDescription(
     key="load_reserve",
     translation_key="load_reserve",
     native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
     state_class=SensorStateClass.MEASUREMENT,
     suggested_display_precision=0,
-    entity_category=EntityCategory.DIAGNOSTIC,
     value_fn=lambda d, i: _wh(d.reserves.get(i)),
 )
 
@@ -243,7 +285,9 @@ async def async_setup_entry(
     # A source removed through Reconfigure takes its sensors with it, rather than leaving
     # them behind as unavailable.
     load_sensors = {
-        load.subentry_id: [*LOAD_SENSORS, *imports] if load.steered else [LOAD_RESERVE, *imports]
+        load.subentry_id: [LOAD_POWER, *LOAD_SENSORS, *imports]
+        if load.steered
+        else [LOAD_POWER, LOAD_RESERVE, *imports]
         for load in coordinator.loads
     }
     expected = {f"{entry.entry_id}_{d.key}" for d in connection_sensors} | {
@@ -307,8 +351,9 @@ class ConnectionSensor(CoordinatorEntity[PeakBasketCoordinator], RestoreEntity, 
             if description.house
             else _connection_device(coordinator)
         )
-        # The device's name is translated: keep new entity IDs the same in every language.
-        self.entity_id = f"sensor.{DOMAIN}_{description.key}"
+        # Names are translated: keep new entity IDs the same in every language.
+        device = "house_" if description.house else ""
+        self.entity_id = f"sensor.{DOMAIN}_{device}{SUFFIXES[description.key]}"
 
     @property
     def available(self) -> bool:
@@ -352,6 +397,8 @@ class LoadSensor(CoordinatorEntity[PeakBasketCoordinator], RestoreEntity, Sensor
             entry_type=DeviceEntryType.SERVICE,
             via_device_id=connection_device_id,
         )
+        # Only used when the entity is first registered: it keeps its ID after a rename.
+        self.entity_id = f"sensor.{DOMAIN}_{load_slug(load.title)}_{SUFFIXES[description.key]}"
 
     @property
     def available(self) -> bool:

@@ -25,9 +25,16 @@ Every window is a **basket** with a fixed amount of energy:
 basket (Wh) = allowed average power (W) x window length (h)     e.g. 5500 W x 0.25 h = 1375 Wh
 ```
 
-- The **target** is the highest of the peak already reached this period, the configured
-  peak goal and the billed minimum. Up to the peak you pay anyway, import is free.
-- The **goal** is the target minus a safety **margin**: the model steers to the goal.
+The tariff is set in power, the basket counts energy, and every name in the UI says which
+of the two it is (the vocabulary and its two rules are in [`CONTEXT.md`](../CONTEXT.md)):
+the basket is the **window budget** (Wh) of the **peak limit** (W), and the safety margin
+(W) keeps a **reserve** (Wh) free.
+
+- The **target** (*Peak limit*) is the highest of the peak already reached this period,
+  the configured peak goal and the billed minimum. Up to the peak you pay anyway, import
+  is free.
+- The **steering limit** (`goal` in the code, never in the UI) is the target minus a
+  safety **margin**: the model steers to it.
 - The house (not controllable) uses from the basket first; the controllable load gets the
   rest.
 - Every window starts with a full basket. What is left does not carry over.
@@ -98,13 +105,20 @@ from other integrations, and everything it decides is published as entities.
 |---|---|
 | Entry | One grid connection: grid power, the window average or the import register, optionally the monthly peak and the meter's phase voltages; the peak goal, margin and maximum source age |
 | Subentries | One per load: its power sensor, its priority and whether it is steered; for a steered load, optionally its phase voltages, and its current range, reaction time and minimum run time |
-| Output | The connection's device: target peak, the basket fields, solar and export. The house's device, under it: house power, house reserve and the house's grid and solar import. Each load's device: its allowed power, grid limit, mode, run minutes, budget left and its grid and solar import. The UI names are in [`CONTEXT.md`](../CONTEXT.md) |
+| Output | The connection's device: the peak limit, the basket fields, solar and export. The house's device, under it: its power, its expected import and its grid and solar import. Each load's device: its power, and its grid and solar import; a steered load also its allowed power, grid limit, mode, run minutes and budget available; a measured-only load its expected import. The UI names are in [`CONTEXT.md`](../CONTEXT.md) |
 | Manifest | `iot_class: calculated`, `integration_type: service` (an integration card with its own device), no requirements, no credentials |
 
 The connection's device is named by translation ("Grid connection", "Aansluiting"), not
 after the entry: Home Assistant lists it under "Devices that don't belong to a sub-entry",
-next to one device per load. Its sensors set their entity IDs to `sensor.peak_basket_<key>`,
-so they are the same in every language; a load's sensors follow the load's name.
+next to one device per load. Every sensor suggests its entity ID, the same in every
+language: the suffix is the slug of its English name, `sensor.peak_basket_<suffix>` on the
+connection, `sensor.peak_basket_house_<suffix>` on the house and
+`sensor.peak_basket_<load>_<suffix>` on a load (`SUFFIXES` in `sensor.py`). `<load>` is the
+slug of the load's title when the entity is first registered; a slug that is `house` or
+starts with `house_` gets `_load` appended, so no load lands on a house ID or, through
+that rule, on another load's. Otherwise Home Assistant appends `_2` on a collision. Home
+Assistant uses a suggested ID only at registration: an entity keeps its ID after a rename,
+and there is no migration.
 
 **Loads follow their allowed power.** A load's grid limit counts on the loads after it
 to yield and on the load itself to stay within its allowed power. A load that ignores it
@@ -185,28 +199,31 @@ Each load's **grid limit** is the whole grid's: the house (with those claims), t
 allowed power, and the measured power of the loads after it, which yield. A circuit limit
 that compares it with the grid's import then throttles the loads that yield first, not
 this one. In fallback the loads that yield count as house, so that all of them stay
-within the goal. A load whose power
+within the steering limit. A load whose power
 is unknown counts as 0 W, see below.
 
-The connection's own figures (house power, used, remaining, house reserve) take every
-load out of the house.
+The connection's own figures (house power, used, remaining, the house's expected import)
+take every load out of the house. Every load also publishes its power as the model uses it:
+missing, stale or negative counts as 0 W.
 
 A **measured-only load** (*Steer this load* off) is not steered: it gets no allowed power,
-grid limit, mode, run minutes or budget, only its grid and solar import, so the basket's
-history shows its share, and a **reserve** (`model/reserve.py`): its grid share times the
-time left, out of what remains after the house reserve, in priority order. Only grid
+grid limit, mode, run minutes or budget, only its power, its grid and solar import, so the
+basket's history shows its share, and an **expected import** (`load_reserve`, `model/reserve.py`):
+its grid share times the time left, out of what remains after the house's expected import,
+in priority order. Only grid
 import comes out of the basket, so the measured loads together project the difference
 between the first steered load's house (`grid − Σ steered`) and the connection's
 (`grid − Σ all loads`), each at least 0: their power without solar, less when solar
 covers part of them. Each gets at most its own power. A steered load's
-room already leaves that out (the load is house to it), but the connection's house
-reserve does not hold it, so without it the stack house reserve + load room would stop
-short of what remains by the measured loads' expected use. For every steered load it is house, whatever its priority: it
+room already leaves that out (the load is house to it), but the house's expected import
+does not hold it, so without it the stack would stop short of what remains by the
+measured loads' expected use. For every steered load it is house, whatever its priority: it
 does not yield, and it never claims. Its priority only orders the measured-only loads
 among themselves for the solar attribution. The connection's figures take it out of the
 house like any load. Its subentry holds only its power sensor and priority; steering it
 later through Reconfigure adds the steering sensors next to the import sensors, under the
-same unique IDs, so the entity IDs stay; its reserve goes, since its room then covers it.
+same unique IDs, so the entity IDs stay; its expected import goes, since its room then
+covers it.
 
 ## The model
 
@@ -236,12 +253,17 @@ else:                                          # PULSE
 The output is the total grid limit (`limit`), the load's allowed power (`limit - house`),
 the minutes the load can still run, and the basket fields:
 
-- **remaining** = `e_rest`, may be negative when the window is over budget;
-- **house reserve** = the house's expected use until the window ends, at most what remains;
-- **load room** = `e_load`, at least zero.
+- **remaining** (*Budget left*) = `e_rest`, may be negative when the window is over budget;
+- **house reserve** (*Expected import*) = the house's expected use until the window ends,
+  at most what remains;
+- **load room** (*Budget available*) = `e_load`, at least zero.
+
+With the margin's **reserve** (*Reserve*, `margin_wh`), one window reads: grid import +
+expected import (house, measured-only loads) + budget available (first steered load) +
+reserve = window budget.
 
 Without the grid power, the load power or the used energy, the model falls back to a
-static circuit at the goal: the load may use `goal - house`, or nothing when the house is
+static circuit at the steering limit: the load may use `goal - house`, or nothing when the house is
 unknown.
 
 ### Publishing
@@ -319,5 +341,5 @@ loads with priority and solar attribution, region profiles, no hardware of its o
    pump's compressor).
 2. Push adapters through Home Assistant services.
 3. Profiles for other regions, and the 12-month target strategy.
-4. A Lovelace card: the basket per window as a stacked bar (house, load, reserve, room,
-   margin), with solar beside it.
+4. A Lovelace card: the window budget as a stacked bar (grid import, expected import,
+   budget available, reserve), with solar beside it.

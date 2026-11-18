@@ -138,7 +138,9 @@ class PeakBasketData:
     flows: Flows = field(default_factory=Flows)
     """Who drew from the basket this window."""
     reserves: dict[str, float | None] = field(default_factory=dict)
-    """Per measured-only load, by subentry id: its power until the window ends (Wh)."""
+    """Per measured-only load, by subentry id: its expected import until the window ends."""
+    powers: dict[str, float] = field(default_factory=dict)
+    """Per load, by subentry id: its power as the model uses it (W)."""
 
 
 @dataclass
@@ -366,6 +368,7 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
             loads=results,
             flows=self._snapshot(used_wh, exported),
             reserves={load.subentry_id: r for load, r in zip(measured, reserves, strict=True)},
+            powers={load.subentry_id: p for load, p in zip(self.loads, powers, strict=True)},
         )
         if self._must_publish(data, now, force=force):
             self._published_at = now

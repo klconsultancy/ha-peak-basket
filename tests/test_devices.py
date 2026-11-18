@@ -30,21 +30,6 @@ async def test_connection_device_says_what_it_is(
     assert device.name == name
 
 
-@pytest.mark.parametrize("language", ["en", "nl"])
-async def test_connection_sensors_keep_language_independent_ids(
-    hass: HomeAssistant, language: str
-) -> None:
-    hass.config.language = language
-    set_sources(hass, 1000, 100.0, 0)
-    entry = await setup_entry(hass)
-    registry = er.async_get(hass)
-    for key in ("basket", "used", "house_grid", "target"):
-        assert (
-            registry.async_get_entity_id("sensor", DOMAIN, f"{entry.entry_id}_{key}")
-            == f"sensor.peak_basket_{key}"
-        )
-
-
 HOUSE_KEYS = ("house_power", "house_reserve", "house_grid", "house_solar")
 
 
@@ -66,11 +51,11 @@ async def test_house_is_its_own_device_under_the_connection(
     assert house.via_device_id == connection.id
     registry = er.async_get(hass)
     for key in HOUSE_KEYS:
-        entity = registry.async_get(f"sensor.peak_basket_{key}")
+        entity_id = registry.async_get_entity_id("sensor", DOMAIN, f"{entry.entry_id}_{key}")
+        entity = registry.async_get(entity_id or "")
         assert entity is not None
         assert entity.device_id == house.id
-        assert entity.unique_id == f"{entry.entry_id}_{key}"
-    basket = registry.async_get("sensor.peak_basket_basket")
+    basket = registry.async_get("sensor.peak_basket_window_budget")
     assert basket is not None
     assert basket.device_id == connection.id
 
@@ -83,13 +68,13 @@ async def test_house_sensors_move_off_the_connection_device(hass: HomeAssistant)
     connection = devices.async_get_device_by_identifier((DOMAIN, entry.entry_id), entry.entry_id)
     assert connection is not None
     registry = er.async_get(hass)
-    registry.async_update_entity("sensor.peak_basket_house_grid", device_id=connection.id)
+    registry.async_update_entity("sensor.peak_basket_house_grid_import", device_id=connection.id)
     assert await hass.config_entries.async_reload(entry.entry_id)
     await hass.async_block_till_done()
     house = devices.async_get_device_by_identifier(
         (DOMAIN, f"{entry.entry_id}_house"), entry.entry_id
     )
-    entity = registry.async_get("sensor.peak_basket_house_grid")
+    entity = registry.async_get("sensor.peak_basket_house_grid_import")
     assert house is not None
     assert entity is not None
     assert entity.device_id == house.id
