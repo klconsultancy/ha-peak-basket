@@ -120,6 +120,14 @@ that rule, on another load's. Otherwise Home Assistant appends `_2` on a collisi
 Assistant uses a suggested ID only at registration: an entity keeps its ID after a rename,
 and there is no migration.
 
+A load's device is Peak Basket's own: its sensors are about the basket, and its subentry
+owns them. When the load's power sensor belongs to a device, the load's device links to it
+(`configuration_url`, `homeassistant://config/devices/device/<id>`), and follows the power
+sensor through a Reconfigure: to the new device, or no link for a sensor without one. It
+is not `via_device`: that means a device is reached through the other, and Peak Basket
+does not talk to the appliance. While the load's device has no area, it takes the
+appliance's, or else the power sensor's own; an area the user picked is kept.
+
 **Loads follow their allowed power.** A load's grid limit counts on the loads after it
 to yield and on the load itself to stay within its allowed power. A load that ignores it
 draws on top of the budget for the whole window. Steer only loads that something drives
