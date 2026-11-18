@@ -125,8 +125,13 @@ owns them. When the load's power sensor belongs to a device, the load's device l
 (`configuration_url`, `homeassistant://config/devices/device/<id>`), and follows the power
 sensor through a Reconfigure: to the new device, or no link for a sensor without one. It
 is not `via_device`: that means a device is reached through the other, and Peak Basket
-does not talk to the appliance. While the load's device has no area, it takes the
-appliance's, or else the power sensor's own; an area the user picked is kept.
+does not talk to the appliance. The area follows events, not the area's current value,
+since the registry cannot tell an area never set from one the user cleared: when the link
+points to another appliance than before (also when the device is created), the device
+takes that appliance's area, or else the power sensor's own, unless it has an area
+already. A reload or a restart changes nothing, so an area the user picked or cleared is
+kept. The link is what records the appliance: a load's device from before the link (0.1.0
+and the rcs up to 0.2.0-rc.3) has none yet, so it gets the link and the area once.
 
 **Loads follow their allowed power.** A load's grid limit counts on the loads after it
 to yield and on the load itself to stay within its allowed power. A load that ignores it

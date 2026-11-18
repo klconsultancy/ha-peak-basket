@@ -165,8 +165,10 @@ steer. It is always there and needs no configuration.
 | Expected import | `sensor.peak_basket_house_expected_import` | What the house will still draw from the grid until the window ends, at its current power (Wh; diagnostic) |
 
 On **each load's** device, named after the load. When the load's power sensor belongs to a
-device, such as the charger or the heat pump, the load's device links to it and takes its
-area; an area you set yourself stays.
+device, such as the charger or the heat pump, the load's device links to it. It takes that
+device's area when the link is made: when the load is added, when Reconfigure points it at
+another device, and once after updating from a version without the link. Not when it has
+an area already, and not on a restart: an area you set or cleared yourself stays.
 
 | Sensor | Entity ID (load "EV charger") | Meaning |
 |---|---|---|

@@ -333,28 +333,32 @@ def _load_device(
     """Describe a load's device, linked to the appliance its power sensor belongs to.
 
     The device is Peak Basket's own, so it only points to the appliance's: not
-    ``via_device``, as Peak Basket does not talk to the appliance. It takes the
-    appliance's area (or the power sensor's) while it has no area of its own, so an area
-    the user picked is kept.
+    ``via_device``, as Peak Basket does not talk to the appliance. When it links to
+    another appliance than before (also when it is created), it takes the appliance's area,
+    or the power sensor's, unless it has an area already. A reload changes nothing, so an
+    area the user picked or cleared is kept.
     """
     entry_id = coordinator.config_entry.entry_id
+    identifiers = {(DOMAIN, f"{entry_id}_{load.subentry_id}")}
     power = er.async_get(hass).async_get(load.power_entity)
     devices = dr.async_get(hass)
     appliance = devices.async_get(power.device_id) if power and power.device_id else None
+    url = f"homeassistant://config/devices/device/{appliance.id}" if appliance else None
+    before = devices.async_get_device(identifiers=identifiers)
     info = DeviceInfo(
-        identifiers={(DOMAIN, f"{entry_id}_{load.subentry_id}")},
+        identifiers=identifiers,
         name=load.title,
         entry_type=DeviceEntryType.SERVICE,
         via_device_id=connection_device_id,
-        configuration_url=(
-            f"homeassistant://config/devices/device/{appliance.id}" if appliance else None
-        ),
+        configuration_url=url,
     )
     device = devices.async_get_or_create(
         config_entry_id=entry_id, config_subentry_id=load.subentry_id, **info
     )
+    # The link records the appliance: the area comes along only when it changes.
+    linked = before is None or before.configuration_url != url
     area = (appliance.area_id if appliance else None) or (power.area_id if power else None)
-    if device.area_id is None and area is not None:
+    if linked and device.area_id is None and area is not None:
         devices.async_update_device(device.id, area_id=area)
     return info
 

@@ -117,6 +117,52 @@ async def test_an_area_the_user_picked_is_kept(hass: HomeAssistant) -> None:
     assert load.configuration_url == _url(other)
 
 
+async def _reload(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    assert await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+
+
+async def test_an_area_the_user_cleared_stays_empty(hass: HomeAssistant) -> None:
+    _appliance(hass, EV, "Wallbox", area="Berging")
+    set_sources(hass, 1000, 100.0, 0)
+    entry = await setup_entry(hass)
+    dr.async_get(hass).async_update_device(_load_device(hass, entry).id, area_id=None)
+    await _reload(hass, entry)
+    assert _load_device(hass, entry).area_id is None
+
+
+async def test_another_appliance_gives_its_area_while_there_is_none(
+    hass: HomeAssistant,
+) -> None:
+    _appliance(hass, EV, "Wallbox", area="Berging")
+    set_sources(hass, 1000, 100.0, 0)
+    entry = await setup_entry(hass)
+    dr.async_get(hass).async_update_device(_load_device(hass, entry).id, area_id=None)
+    _appliance(hass, OTHER, "Heat pump", area="Kelder")
+    await _change_power_sensor(hass, entry, OTHER)
+    assert _load_device(hass, entry).area_id == _area(hass, "Kelder")
+
+
+async def test_a_device_from_before_the_link_takes_the_area_once(hass: HomeAssistant) -> None:
+    """A load's device without a link yet, as from an earlier version, gets it with the area.
+
+    Only once: the link records the appliance, so a cleared area stays cleared after that.
+    """
+    set_sources(hass, 1000, 100.0, 0)
+    entry = await setup_entry(hass)
+    # Home Assistant does not hand out an entity ID that is in the state machine.
+    hass.states.async_remove(EV)
+    appliance = _appliance(hass, EV, "Wallbox", area="Berging")
+    set_sources(hass, 1000, 100.0, 0)
+    await _reload(hass, entry)
+    load = _load_device(hass, entry)
+    assert load.configuration_url == _url(appliance)
+    assert load.area_id == _area(hass, "Berging")
+    dr.async_get(hass).async_update_device(load.id, area_id=None)
+    await _reload(hass, entry)
+    assert _load_device(hass, entry).area_id is None
+
+
 async def test_the_link_follows_the_power_sensor(hass: HomeAssistant) -> None:
     _appliance(hass, EV, "Wallbox", area="Berging")
     set_sources(hass, 1000, 100.0, 0)
