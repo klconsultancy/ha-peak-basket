@@ -301,11 +301,9 @@ async def async_setup_entry(
             registry.async_remove(registered.entity_id)
     async_add_entities(ConnectionSensor(coordinator, d, connection.id) for d in connection_sensors)
     for load in coordinator.loads:
+        device = _load_device(hass, coordinator, load, connection.id)
         async_add_entities(
-            (
-                LoadSensor(coordinator, load, d, connection.id)
-                for d in load_sensors[load.subentry_id]
-            ),
+            (LoadSensor(coordinator, load, d, device) for d in load_sensors[load.subentry_id]),
             config_subentry_id=load.subentry_id,
         )
 
@@ -327,6 +325,42 @@ def _house_device(coordinator: PeakBasketCoordinator, connection_device_id: str)
         entry_type=DeviceEntryType.SERVICE,
         via_device_id=connection_device_id,
     )
+
+
+def _load_device(
+    hass: HomeAssistant, coordinator: PeakBasketCoordinator, load: Load, connection_device_id: str
+) -> DeviceInfo:
+    """Describe a load's device, linked to the appliance its power sensor belongs to.
+
+    The device is Peak Basket's own, so it only points to the appliance's: not
+    ``via_device``, as Peak Basket does not talk to the appliance. When it links to
+    another appliance than before (also when it is created), it takes the appliance's area,
+    or the power sensor's, unless it has an area already. A reload changes nothing, so an
+    area the user picked or cleared is kept.
+    """
+    entry_id = coordinator.config_entry.entry_id
+    identifiers = {(DOMAIN, f"{entry_id}_{load.subentry_id}")}
+    power = er.async_get(hass).async_get(load.power_entity)
+    devices = dr.async_get(hass)
+    appliance = devices.async_get(power.device_id) if power and power.device_id else None
+    url = f"homeassistant://config/devices/device/{appliance.id}" if appliance else None
+    before = devices.async_get_device(identifiers=identifiers)
+    info = DeviceInfo(
+        identifiers=identifiers,
+        name=load.title,
+        entry_type=DeviceEntryType.SERVICE,
+        via_device_id=connection_device_id,
+        configuration_url=url,
+    )
+    device = devices.async_get_or_create(
+        config_entry_id=entry_id, config_subentry_id=load.subentry_id, **info
+    )
+    # The link records the appliance: the area comes along only when it changes.
+    linked = before is None or before.configuration_url != url
+    area = (appliance.area_id if appliance else None) or (power.area_id if power else None)
+    if linked and device.area_id is None and area is not None:
+        devices.async_update_device(device.id, area_id=area)
+    return info
 
 
 class ConnectionSensor(CoordinatorEntity[PeakBasketCoordinator], RestoreEntity, SensorEntity):
@@ -383,7 +417,7 @@ class LoadSensor(CoordinatorEntity[PeakBasketCoordinator], RestoreEntity, Sensor
         coordinator: PeakBasketCoordinator,
         load: Load,
         description: LoadSensorDescription,
-        connection_device_id: str,
+        device: DeviceInfo,
     ) -> None:
         """Attach the sensor to the load's device, under the connection's."""
         super().__init__(coordinator)
@@ -391,12 +425,7 @@ class LoadSensor(CoordinatorEntity[PeakBasketCoordinator], RestoreEntity, Sensor
         self._subentry_id = load.subentry_id
         entry_id = coordinator.config_entry.entry_id
         self._attr_unique_id = f"{entry_id}_{load.subentry_id}_{description.key}"
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, f"{entry_id}_{load.subentry_id}")},
-            name=load.title,
-            entry_type=DeviceEntryType.SERVICE,
-            via_device_id=connection_device_id,
-        )
+        self._attr_device_info = device
         # Only used when the entity is first registered: it keeps its ID after a rename.
         self.entity_id = f"sensor.{DOMAIN}_{load_slug(load.title)}_{SUFFIXES[description.key]}"
 
