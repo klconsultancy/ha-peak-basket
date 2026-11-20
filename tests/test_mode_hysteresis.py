@@ -51,7 +51,10 @@ START_HOUSE = GOAL - P_MIN * (90 + 300) / 900
 async def test_an_idle_load_around_the_start_changes_the_mode_once(
     hass: HomeAssistant, freezer: FrozenDateTimeFactory
 ) -> None:
-    """The house swings 20 W around an idle load's start every 5 s, for a minute.
+    """The house swings 120 W around an idle load's start every 5 s, for a minute.
+
+    As the oven did in the 17:30 window of #88, at the start of the window: 80 W below the
+    start over the 900 s left moves the load's room by 20 Wh.
 
     As a HomeWizard writes it: the power first, then the window average a moment later.
     The grid power evaluates on the old average, so it sees 5 s of import too little.
@@ -59,17 +62,17 @@ async def test_an_idle_load_around_the_start_changes_the_mode_once(
     sources = {**SOURCES, "window_average": AVERAGE}
     del sources["grid_import_energy"]
     freezer.move_to("2026-11-15T03:14:59+00:00")
-    set_sources(hass, START_HOUSE + 20, 100.0, 0)
+    set_sources(hass, START_HOUSE + 40, 100.0, 0)
     hass.states.async_set(AVERAGE, "0", {"unit_of_measurement": "W"})
     await setup_entry(hass, sources)
     start = dt_util.parse_datetime("2026-11-15T03:15:00+00:00")
     assert start is not None
     used_j = 0.0
-    house = START_HOUSE + 20
+    house = START_HOUSE + 40
     modes = []
     for k in range(1, 13):
         used_j += house * 5
-        house = START_HOUSE + 20 if k % 2 else START_HOUSE - 20
+        house = START_HOUSE + 40 if k % 2 else START_HOUSE - 80
         freezer.move_to(start + timedelta(seconds=5 * k))
         hass.states.async_set(GRID, str(house), {"unit_of_measurement": "W"})
         await hass.async_block_till_done()

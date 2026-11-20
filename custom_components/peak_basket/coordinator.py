@@ -228,7 +228,8 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
         # continuous boundary.
         self._modes: dict[str, Mode] = {}
         # The window and its import from the meter's average, last taken as it was.
-        self._average_used: tuple[datetime, float] | None = None
+        # With the moment of its report: the import since then is added at the grid power.
+        self._average_used: tuple[datetime, float, datetime] | None = None
         self._unsubs: list[CALLBACK_TYPE] = []
         self._started_at = dt_util.now()
 
@@ -575,7 +576,7 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
             if state is not None and state.last_reported < start:
                 # The meter resets its average a second or two after the boundary; until
                 # then it shows the previous window's.
-                return self._since_report(state, start, now, grid)
+                return self._since(start, now, grid)
             avg = self._power_w(str(avg_entity), now)
             if avg is None:
                 return None
@@ -595,30 +596,31 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
                     left,
                     last[1],
                 )
-                return last[1]
-            self._average_used = (start, used)
-            return used + self._since_report(state, start, now, grid)
+                return last[1] + self._since(last[2], now, grid)
+            reported = max(state.last_reported, start) if state is not None else now
+            self._average_used = (start, used, reported)
+            return used + self._since(reported, now, grid)
 
         entity_id = self._entity(CONF_GRID_IMPORT_ENERGY)
         reading = self._energy_wh(entity_id, now)
         counted = self._import.since_start(start, now, reading, self._max_age)
         if counted is None:
             return None
-        # The start value is the last reading before the boundary: count from that one too.
-        return counted + self._since_report(self.hass.states.get(entity_id), None, now, grid)
+        # From the reading's report, also before the boundary: the start value is the last
+        # reading before it, so the first seconds count a little of the previous window
+        # again, the safe side and the start value's own convention.
+        state = self.hass.states.get(entity_id)
+        return counted + self._since(state.last_reported if state else None, now, grid)
 
     @staticmethod
-    def _since_report(
-        state: State | None, start: datetime | None, now: datetime, grid: float | None
-    ) -> float:
-        """Return the import since the energy reading, at the grid power, in Wh.
+    def _since(since: datetime | None, now: datetime, grid: float | None) -> float:
+        """Return the import since an energy reading's report, at the grid power, in Wh.
 
         A meter writes its power and its energy one after the other, and the energy may
         report less often: an evaluation on the power alone would see too little used.
         """
-        if state is None or grid is None:
+        if since is None or grid is None:
             return 0.0
-        since = state.last_reported if start is None else max(state.last_reported, start)
         return max(grid, 0.0) * max((now - since).total_seconds(), 0.0) / SECONDS_PER_HOUR
 
     def _entity(self, key: str) -> str:

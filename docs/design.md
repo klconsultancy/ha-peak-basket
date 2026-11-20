@@ -297,7 +297,7 @@ else:                                          # PULSE
     e_load    = e_rest - house x rest
     p_load    = max(load, p_min)
     threshold = p_load x (reaction + (0 if load > 100 W else min_charge_time))
-    threshold += 200 x min_charge_time         if the previous mode was pulse off
+    threshold += 200 x rest                    if the previous mode was pulse off
     on:  limit = house + p_min + 200           when e_load > threshold
     off: limit = house
 ```
@@ -319,13 +319,12 @@ test holds the model to.
 
 The pulse threshold has a band of its own, for the same reason: an idle load waiting
 for its start with a steady house keeps `e_load` almost constant (the house's use and its
-reserve shrink alike), so it can sit on the threshold for minutes, and the noise of the
-house times the time left (60 W x 800 s is 13 Wh) moves it across on every evaluation.
-Each crossing turns the grid limit from the house to `house + p_min + 200` and back, and a
-consumer without a start delay would start and stop on it. Stopping stays immediate, the
-safe side; from pulse off, pulse on needs the pulse headroom for the minimum run time on
-top (200 W x 300 s is about 17 Wh), so the load that starts surely gets its minimum run
-time with that headroom.
+reserve shrink alike), so it can sit on the threshold for minutes, and the house's noise
+moves `e_load` by the noise times the time left. Each crossing turns the grid limit from
+the house to `house + p_min + 200` and back, and a consumer without a start delay would
+start and stop on it. Stopping stays immediate, the safe side; from pulse off, pulse on
+needs the house the pulse headroom below the start. As a power, the band holds whatever
+the time left, and it is the same 200 W as on the continuous boundary.
 
 The output is the total grid limit (`limit`), the load's allowed power (`limit - house`),
 the minutes the load can still run, and the basket fields:

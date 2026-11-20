@@ -424,9 +424,8 @@ def test_coming_back_from_pulse_on_the_limit_does_not_jump() -> None:
 # An idle load may start with budget for the reaction and minimum run time: 4140 W for
 # 390 s. Nothing used at the window start, so that is the budget minus the house's 900 s.
 START_HOUSE = GOAL - P_MIN * (P.reaction_s + P.min_charge_s) / 900
-# From pulse off, a start needs the pulse headroom for the minimum run time on top: 60 kJ,
-# over the 900 s left 66.7 W less house.
-START_BAND_W = P.pulse_headroom_w * P.min_charge_s / 900
+# From pulse off, a start needs the house the pulse headroom below that.
+START_BAND_W = P.pulse_headroom_w
 
 
 @pytest.mark.parametrize("previous", [None, Mode.FALLBACK, Mode.CONTINUOUS, Mode.PULSE_ON])

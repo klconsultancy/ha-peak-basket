@@ -86,8 +86,8 @@ class ModelInput:
     previous_mode: Mode | None = None
     """The load's mode of the previous evaluation, so the mode does not flip on every
     evaluation around a boundary. From pulse, continuous needs the pulse headroom on top of
-    the load's minimum; from pulse off, pulse on needs the pulse headroom for the minimum
-    run time on top of the start's budget. ``None`` (and fallback) decides without either."""
+    the load's minimum; from pulse off, pulse on needs the house the pulse headroom below
+    the start, for the rest of the window. ``None`` (and fallback) decides without either."""
 
 
 @dataclass(frozen=True)
@@ -207,8 +207,9 @@ def evaluate(
         running = load > params.charging_threshold_w
         threshold = p_load * (params.reaction_s + (0.0 if running else params.min_charge_s))
         if inp.previous_mode is Mode.PULSE_OFF:
-            # Stopping is immediate, the safe side; starting again needs a band.
-            threshold += params.pulse_headroom_w * params.min_charge_s
+            # Stopping is immediate, the safe side; starting again needs a band. As a power,
+            # since the house's noise moves e_load by the noise times the rest.
+            threshold += params.pulse_headroom_w * rest
         if e_load > threshold:
             mode = Mode.PULSE_ON
             limit = house + p_min + params.pulse_headroom_w
