@@ -84,9 +84,10 @@ class ModelInput:
     """Power claimed by loads with a higher priority that may start but do not draw yet.
     It counts as house, so two loads cannot count on the same room."""
     previous_mode: Mode | None = None
-    """The load's mode of the previous evaluation. From pulse, continuous needs the pulse
-    headroom on top of the load's minimum, so the mode does not flip on every evaluation
-    around the boundary. ``None`` (and fallback, continuous) decides without it."""
+    """The load's mode of the previous evaluation, so the mode does not flip on every
+    evaluation around a boundary. From pulse, continuous needs the pulse headroom on top of
+    the load's minimum; from pulse off, pulse on needs the house the pulse headroom below
+    the start, for the rest of the window. ``None`` (and fallback) decides without either."""
 
 
 @dataclass(frozen=True)
@@ -205,6 +206,10 @@ def evaluate(
         p_load = max(load, p_min)
         running = load > params.charging_threshold_w
         threshold = p_load * (params.reaction_s + (0.0 if running else params.min_charge_s))
+        if inp.previous_mode is Mode.PULSE_OFF:
+            # Stopping is immediate, the safe side; starting again needs a band. As a power,
+            # since the house's noise moves e_load by the noise times the rest.
+            threshold += params.pulse_headroom_w * rest
         if e_load > threshold:
             mode = Mode.PULSE_ON
             limit = house + p_min + params.pulse_headroom_w

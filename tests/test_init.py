@@ -62,7 +62,8 @@ async def test_next_window_starts_from_the_last_reading_before_it(
     assert value(hass, "mode") == "pulse_on"
     assert float(value(hass, "house_power")) == 1650
     assert float(value(hass, "allowed_power")) == pytest.approx(4340)
-    assert float(value(hass, "used")) == 0
+    # The counter's 4 s since its last report, at the grid power.
+    assert float(value(hass, "used")) == pytest.approx(1650 * 4 / 3600, abs=1)
 
     # 1.2 kWh imported 10 min in: the house reserve takes the rest, so the load stops.
     freezer.move_to("2026-11-15T03:25:02+00:00")
@@ -391,7 +392,8 @@ async def test_previous_windows_average_counts_as_nothing_used(
     freezer.move_to("2026-11-15T03:15:01+00:00")
     hass.states.async_set(GRID, "5171", {"unit_of_measurement": "W"})
     await tick(hass)  # a higher limit waits for the tick
-    assert float(value(hass, "used")) == 0
+    # Only the second since the boundary, at the grid power.
+    assert float(value(hass, "used")) == pytest.approx(5171 / 3600, abs=1)
     assert value(hass, "mode") == "continuous"
     assert float(value(hass, "allowed_power")) > 4000
 

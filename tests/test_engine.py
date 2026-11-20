@@ -419,3 +419,21 @@ def test_coming_back_from_pulse_on_the_limit_does_not_jump() -> None:
     assert pulse.mode == Mode.PULSE_ON
     assert back.mode == Mode.CONTINUOUS
     assert back.limit_w == pytest.approx(pulse.limit_w, abs=1)
+
+
+# An idle load may start with budget for the reaction and minimum run time: 4140 W for
+# 390 s. Nothing used at the window start, so that is the budget minus the house's 900 s.
+START_HOUSE = GOAL - P_MIN * (P.reaction_s + P.min_charge_s) / 900
+# From pulse off, a start needs the house the pulse headroom below that.
+START_BAND_W = P.pulse_headroom_w
+
+
+@pytest.mark.parametrize("previous", [None, Mode.FALLBACK, Mode.CONTINUOUS, Mode.PULSE_ON])
+def test_without_a_pulse_off_before_the_start_is_plain(previous: Mode | None) -> None:
+    assert _after(previous, START_HOUSE - 1) == Mode.PULSE_ON
+    assert _after(previous, START_HOUSE + 1) == Mode.PULSE_OFF
+
+
+def test_from_pulse_off_a_start_needs_the_start_band() -> None:
+    assert _after(Mode.PULSE_OFF, START_HOUSE - START_BAND_W + 1) == Mode.PULSE_OFF
+    assert _after(Mode.PULSE_OFF, START_HOUSE - START_BAND_W - 1) == Mode.PULSE_ON

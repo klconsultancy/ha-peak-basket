@@ -156,7 +156,7 @@ when Home Assistant is away. Push adapters (a mapping from the advice to a `numb
   window's length, so a sensor over another period gives a wrong budget without a
   warning. It is exact, also right after a restart. The meter resets it a second or two after the
   boundary; a value reported before the window started still belongs to the previous
-  window and counts as nothing used yet. A reading with a fresh timestamp can still carry
+  window and counts as nothing used before the boundary. A reading with a fresh timestamp can still carry
   the previous window (a reader that polls just before the meter resets), so the used
   energy is also capped at what any connection can import since the boundary: the seconds
   into the window times 69 kW (3 x 230 V x 100 A). A meter whose clock runs a few seconds
@@ -176,6 +176,12 @@ when Home Assistant is away. Push adapters (a mapping from the advice to a `numb
   register taken as Wh would count nearly the whole register as this window's. The export
   register is read the same way, and a window's export above the same 69 kW cap is
   refused: the export then comes from the negative grid power.
+  Either reading is as old as its last report (`last_reported`), so the coordinator adds
+  the import since then at the grid power (for the average, since the boundary at most). A
+  meter such as a HomeWizard writes its power and its average one after the other, every
+  5 s: an evaluation on the power alone would see 5 s of import too little, and with an
+  idle load near its start that alone was enough to start and stop it. It only adds, the
+  safe side, and the next report replaces the estimate.
 - **Staleness.** A source older than the configured maximum age counts as unavailable. The
   monthly peak is exempt: it changes rarely.
 - **A load's power** that is unavailable or older than the maximum age counts as 0 W, not
@@ -291,6 +297,7 @@ else:                                          # PULSE
     e_load    = e_rest - house x rest
     p_load    = max(load, p_min)
     threshold = p_load x (reaction + (0 if load > 100 W else min_charge_time))
+    threshold += 200 x rest                    if the previous mode was pulse off
     on:  limit = house + p_min + 200           when e_load > threshold
     off: limit = house
 ```
@@ -309,6 +316,15 @@ house). A band decoupled from `pulse_headroom_w` would bring the jump on return 
 previous mode is an input (`previous_mode`), so the model stays pure; without it (the
 first evaluation, after fallback) the boundary is plain, as in the Jinja macro the parity
 test holds the model to.
+
+The pulse threshold has a band of its own, for the same reason: an idle load waiting
+for its start with a steady house keeps `e_load` almost constant (the house's use and its
+reserve shrink alike), so it can sit on the threshold for minutes, and the house's noise
+moves `e_load` by the noise times the time left. Each crossing turns the grid limit from
+the house to `house + p_min + 200` and back, and a consumer without a start delay would
+start and stop on it. Stopping stays immediate, the safe side; from pulse off, pulse on
+needs the house the pulse headroom below the start. As a power, the band holds whatever
+the time left, and it is the same 200 W as on the continuous boundary.
 
 The output is the total grid limit (`limit`), the load's allowed power (`limit - house`),
 the minutes the load can still run, and the basket fields:

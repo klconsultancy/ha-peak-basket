@@ -334,12 +334,18 @@ async def test_a_meter_ahead_keeps_the_windows_totals_up_to_the_boundary(
     assert float(value(hass, "used")) == 475  # 1900 W over 900 s
     assert float(value(hass, "house_grid")) == 475
 
+    # Between reports the grid power adds the import since: 1900 W for 4 s is 2.1 Wh.
+    freezer.move_to("2026-11-15T07:59:56+00:00")
+    await tick(hass)
+    assert float(value(hass, "used")) == 477  # 475 + 2.1
+
     caplog.set_level(logging.DEBUG, "custom_components.peak_basket")
     await _at(hass, freezer, "2026-11-15T07:59:58+00:00", grid=1900, ev=0, average=2)
-    assert float(value(hass, "used")) == 475
+    # Kept, with the import since the last report before the drop: it never goes down.
+    assert float(value(hass, "used")) == 478  # 475 + 3.2
     # The meter's clock runs at least the seconds left ahead.
     assert "Window average dropped 2 s before the boundary" in caplog.text
-    assert float(value(hass, "house_grid")) == 475
+    assert float(value(hass, "house_grid")) == 478  # 475 + 3.2
 
     await _at(hass, freezer, "2026-11-15T08:00:03+00:00", grid=1900, ev=0, average=40)
     assert float(value(hass, "used")) == 10
