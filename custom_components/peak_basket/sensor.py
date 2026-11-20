@@ -339,14 +339,14 @@ def _load_device(
     area the user picked or cleared is kept.
     """
     entry_id = coordinator.config_entry.entry_id
-    identifiers = {(DOMAIN, f"{entry_id}_{load.subentry_id}")}
+    identifier = (DOMAIN, f"{entry_id}_{load.subentry_id}")
     power = er.async_get(hass).async_get(load.power_entity)
     devices = dr.async_get(hass)
     appliance = devices.async_get(power.device_id) if power and power.device_id else None
     url = f"homeassistant://config/devices/device/{appliance.id}" if appliance else None
-    before = devices.async_get_device(identifiers=identifiers)
+    before = devices.async_get_device_by_identifier(identifier, entry_id)
     info = DeviceInfo(
-        identifiers=identifiers,
+        identifiers={identifier},
         name=load.title,
         entry_type=DeviceEntryType.SERVICE,
         via_device_id=connection_device_id,

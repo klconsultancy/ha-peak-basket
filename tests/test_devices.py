@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 import pytest
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import frame
 
 from custom_components.peak_basket.const import DOMAIN
 
@@ -78,3 +79,15 @@ async def test_house_sensors_move_off_the_connection_device(hass: HomeAssistant)
     assert house is not None
     assert entity is not None
     assert entity.device_id == house.id
+
+
+async def test_setup_uses_no_deprecated_helper(
+    hass: HomeAssistant, caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Home Assistant reports a deprecated call once per integration: start with none."""
+    monkeypatch.setattr(frame, "_REPORTED_INTEGRATIONS", set())
+    set_sources(hass, 1000, 100.0, 0)
+    entry = await setup_entry(hass)
+    assert await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+    assert "custom integration 'peak_basket' calls" not in caplog.text
