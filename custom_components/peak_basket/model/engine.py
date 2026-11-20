@@ -83,6 +83,10 @@ class ModelInput:
     reserved_w: float = 0.0
     """Power claimed by loads with a higher priority that may start but do not draw yet.
     It counts as house, so two loads cannot count on the same room."""
+    previous_mode: Mode | None = None
+    """The load's mode of the previous evaluation. From pulse, continuous needs the pulse
+    headroom on top of the load's minimum, so the mode does not flip on every evaluation
+    around the boundary. ``None`` (and fallback, continuous) decides without it."""
 
 
 @dataclass(frozen=True)
@@ -185,7 +189,10 @@ def evaluate(
     p_avg = e_rest / max(rest, 1.0)  # no division by zero on the boundary itself
     e_load = e_rest - house * rest  # J left for the load after the house
 
-    if p_avg - house >= p_min:
+    # Leaving continuous is immediate, the safe side; coming back from pulse needs a band.
+    pulsing = inp.previous_mode in {Mode.PULSE_ON, Mode.PULSE_OFF}
+    band = params.pulse_headroom_w if pulsing else 0.0
+    if p_avg - house >= p_min + band:
         mode = Mode.CONTINUOUS
         limit = min(p_avg, house + p_max)
         base = max(goal, house + p_min)

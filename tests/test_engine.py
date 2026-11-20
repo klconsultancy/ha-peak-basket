@@ -359,3 +359,63 @@ class TestSeveralLoads:
         )
         assert claimed.house_w == pytest.approx(4000)
         assert claimed.allowed_load_w < free.allowed_load_w
+
+
+def _after(previous: Mode | None, house: float) -> Mode:
+    """The mode at the window start (budget 5400 W on average) with this house and no load."""
+    return evaluate(
+        ModelInput(
+            target_w=TARGET,
+            seconds_in_window=0,
+            grid_import_w=house,
+            load_w=0,
+            window_import_wh=0,
+            voltages=V3,
+            previous_mode=previous,
+        ),
+        BE_FLANDERS,
+    ).mode
+
+
+# Continuous while the budget minus the house covers the load's minimum: house <= 1260 W.
+@pytest.mark.parametrize("previous", [None, Mode.FALLBACK, Mode.CONTINUOUS])
+def test_without_a_pulse_before_the_boundary_is_plain(previous: Mode | None) -> None:
+    assert _after(previous, GOAL - P_MIN) == Mode.CONTINUOUS
+    assert _after(previous, GOAL - P_MIN + 40) == Mode.PULSE_ON
+
+
+@pytest.mark.parametrize("previous", [Mode.PULSE_ON, Mode.PULSE_OFF])
+def test_back_to_continuous_only_with_the_headroom(previous: Mode) -> None:
+    """From pulse, continuous needs the load's minimum plus the pulse headroom (200 W)."""
+    assert _after(previous, GOAL - P_MIN - 40) != Mode.CONTINUOUS
+    assert _after(previous, GOAL - P_MIN - P.pulse_headroom_w) == Mode.CONTINUOUS
+
+
+def test_leaving_continuous_is_immediate() -> None:
+    """The safe direction: no band when the budget no longer covers the minimum."""
+    assert _after(Mode.CONTINUOUS, GOAL - P_MIN + 1) == Mode.PULSE_ON
+
+
+def test_coming_back_from_pulse_on_the_limit_does_not_jump() -> None:
+    """At the return threshold, continuous's limit is the pulse-on limit: the band is the
+    pulse headroom for that reason, not just some hysteresis."""
+
+    def at(house: float) -> ModelResult:
+        return evaluate(
+            ModelInput(
+                target_w=TARGET,
+                seconds_in_window=0,
+                grid_import_w=house,
+                load_w=0,
+                window_import_wh=0,
+                voltages=V3,
+                previous_mode=Mode.PULSE_ON,
+            ),
+            BE_FLANDERS,
+        )
+
+    threshold = GOAL - P_MIN - P.pulse_headroom_w
+    pulse, back = at(threshold + 1), at(threshold)
+    assert pulse.mode == Mode.PULSE_ON
+    assert back.mode == Mode.CONTINUOUS
+    assert back.limit_w == pytest.approx(pulse.limit_w, abs=1)
