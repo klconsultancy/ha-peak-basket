@@ -309,6 +309,7 @@ house). A band decoupled from `pulse_headroom_w` would bring the jump on return 
 previous mode is an input (`previous_mode`), so the model stays pure; without it (the
 first evaluation, after fallback) the boundary is plain, as in the Jinja macro the parity
 test holds the model to.
+
 The output is the total grid limit (`limit`), the load's allowed power (`limit - house`),
 the minutes the load can still run, and the basket fields:
 
