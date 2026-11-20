@@ -80,8 +80,10 @@ count it as house, while the load has demand.
 
 **Demand** (*Wants power* in the UI, *Wil vermogen* in Dutch)
 : Whether a load wants power now, from an optional on/off entity per load (vehicle
-connected, thermostat calling for heat). Only matters with more than one load. Without one,
-an idle load's claim lasts its reaction time.
+connected, thermostat calling for heat). Recommended for a charger: without one, a house
+rise can count as an idle load's within the lag limit, also with no car plugged in. With
+more than one load it also decides the claim: without one, an idle load's claim lasts its
+reaction time.
 
 **Stale reading, lagging reading** (never in the UI)
 : Stale: older than the maximum age of a reading; a stale grid power puts the loads in safe

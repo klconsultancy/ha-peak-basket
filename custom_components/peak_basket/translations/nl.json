@@ -53,7 +53,7 @@
           "extra_a": "Inhaalstroom laatste 5 minuten"
         },
         "data_description": {
-          "demand": "Aanbevolen voor een laadpaal. Een entiteit die aan staat zolang deze afnemer stroom wil, zoals “auto aangesloten” van een laadpaal of een thermostaat die warmte vraagt. Zonder deze entiteit kan een stijging van het huisverbruik tot 45 s als die van deze afnemer tellen terwijl hij stilstaat, ook zonder aangesloten auto. Met meerdere afnemers houdt Peak Basket zolang ze aan staat ook budget voor deze afnemer vrij, ook als hij nog niets trekt; de afnemers na hem kunnen dat budget dan niet gebruiken. Zonder deze entiteit duurt die reservering de reactietijd.",
+          "demand": "Aanbevolen voor een laadpaal. Een entiteit die aan staat zolang deze afnemer vermogen wil, zoals “auto aangesloten” van een laadpaal of een thermostaat die warmte vraagt. Zonder deze entiteit kan een stijging van het vermogen van het huis tot 45 s als die van deze afnemer tellen terwijl hij stilstaat, ook zonder aangesloten auto. Met meerdere afnemers houdt Peak Basket zolang ze aan staat ook budget voor deze afnemer vrij, ook als hij nog niets trekt; de afnemers na hem kunnen dat budget dan niet gebruiken. Zonder deze entiteit duurt die reservering de reactietijd.",
           "voltages": "Gemeten spanning per fase aan de afnemer, in volgorde L1, L2, L3. Samen met de minimale en maximale stroom bepalen ze het vermogensbereik. Zonder: de spanning van de meter, anders 230 V.",
           "reaction_s": "Tijd tussen een lagere limiet en het effectief zakken van de afnemer (bv. EVCC ≈ 20 s + 30 s cache).",
           "min_charge_s": "Is er niet genoeg voor de hele meetperiode, dan start de afnemer pas als er nog minstens zo lang budget over is.",
@@ -144,7 +144,7 @@
             "extra_a": "Inhaalstroom laatste 5 minuten"
           },
           "data_description": {
-            "demand": "Aanbevolen voor een laadpaal. Een entiteit die aan staat zolang deze afnemer stroom wil, zoals “auto aangesloten” van een laadpaal of een thermostaat die warmte vraagt. Zonder deze entiteit kan een stijging van het huisverbruik tot 45 s als die van deze afnemer tellen terwijl hij stilstaat, ook zonder aangesloten auto. Met meerdere afnemers houdt Peak Basket zolang ze aan staat ook budget voor deze afnemer vrij, ook als hij nog niets trekt; de afnemers na hem kunnen dat budget dan niet gebruiken. Zonder deze entiteit duurt die reservering de reactietijd.",
+            "demand": "Aanbevolen voor een laadpaal. Een entiteit die aan staat zolang deze afnemer vermogen wil, zoals “auto aangesloten” van een laadpaal of een thermostaat die warmte vraagt. Zonder deze entiteit kan een stijging van het vermogen van het huis tot 45 s als die van deze afnemer tellen terwijl hij stilstaat, ook zonder aangesloten auto. Met meerdere afnemers houdt Peak Basket zolang ze aan staat ook budget voor deze afnemer vrij, ook als hij nog niets trekt; de afnemers na hem kunnen dat budget dan niet gebruiken. Zonder deze entiteit duurt die reservering de reactietijd.",
             "voltages": "Gemeten spanning per fase aan de afnemer, in volgorde L1, L2, L3. Samen met de minimale en maximale stroom bepalen ze het vermogensbereik. Zonder: de spanning van de meter, anders 230 V.",
             "reaction_s": "Tijd tussen een lagere limiet en het effectief zakken van de afnemer (bv. EVCC ≈ 20 s + 30 s cache).",
             "min_charge_s": "Is er niet genoeg voor de hele meetperiode, dan start de afnemer pas als er nog minstens zo lang budget over is.",
@@ -179,7 +179,7 @@
             "extra_a": "Inhaalstroom laatste 5 minuten"
           },
           "data_description": {
-            "demand": "Aanbevolen voor een laadpaal. Een entiteit die aan staat zolang deze afnemer stroom wil, zoals “auto aangesloten” van een laadpaal of een thermostaat die warmte vraagt. Zonder deze entiteit kan een stijging van het huisverbruik tot 45 s als die van deze afnemer tellen terwijl hij stilstaat, ook zonder aangesloten auto. Met meerdere afnemers houdt Peak Basket zolang ze aan staat ook budget voor deze afnemer vrij, ook als hij nog niets trekt; de afnemers na hem kunnen dat budget dan niet gebruiken. Zonder deze entiteit duurt die reservering de reactietijd.",
+            "demand": "Aanbevolen voor een laadpaal. Een entiteit die aan staat zolang deze afnemer vermogen wil, zoals “auto aangesloten” van een laadpaal of een thermostaat die warmte vraagt. Zonder deze entiteit kan een stijging van het vermogen van het huis tot 45 s als die van deze afnemer tellen terwijl hij stilstaat, ook zonder aangesloten auto. Met meerdere afnemers houdt Peak Basket zolang ze aan staat ook budget voor deze afnemer vrij, ook als hij nog niets trekt; de afnemers na hem kunnen dat budget dan niet gebruiken. Zonder deze entiteit duurt die reservering de reactietijd.",
             "voltages": "Gemeten spanning per fase aan de afnemer, in volgorde L1, L2, L3. Samen met de minimale en maximale stroom bepalen ze het vermogensbereik. Zonder: de spanning van de meter, anders 230 V.",
             "reaction_s": "Tijd tussen een lagere limiet en het effectief zakken van de afnemer (bv. EVCC ≈ 20 s + 30 s cache).",
             "min_charge_s": "Is er niet genoeg voor de hele meetperiode, dan start de afnemer pas als er nog minstens zo lang budget over is.",
