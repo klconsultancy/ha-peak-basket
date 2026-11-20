@@ -301,7 +301,7 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
         # does not produce power, so a negative reading (a meter's standby offset) counts
         # as 0 W too: the engine, the sums and the reserves then all see the same powers.
         powers = [max(self._power_w(load.power_entity, now) or 0.0, 0.0) for load in self.loads]
-        powers = self._paired(powers, grid, now)
+        powers = self._paired(powers, grid, start, now)
 
         connection = evaluate(
             ModelInput(
@@ -387,20 +387,27 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
             self._published_at = now
             self.async_set_updated_data(data)
 
-    def _paired(self, powers: list[float], grid: float | None, now: datetime) -> list[float]:
+    def _paired(
+        self, powers: list[float], grid: float | None, start: datetime, now: datetime
+    ) -> list[float]:
         """Take a grid step since a load's last reading as the load's, within limits.
 
         A load's sensor can lag the grid power: a start or a stop shows on the grid first.
         Each reading is paired with the grid power of its own moment, at most the lag
         limit back. A rise since then is the load's up to what it was allowed on top of
         its reading at that moment (not now: a rise taken as house lowers what it is allowed),
-        and, for an idle load, only from half its minimum power: it starts at least at its
-        minimum, so a smaller rise is the house's (a meter may catch a start half-way).
+        and, for an idle load, only while it can start (``_may_start``) and from half its
+        minimum power: it starts at least at its minimum, so a smaller rise is the house's
+        (a meter may catch a start half-way).
         A drop is the load's down to 0 W; the rest is the house's. Loads go
-        in order, so the same step is not taken twice. A measured-only load is allowed
-        nothing, so its start counts as house until its sensor follows: the safe side.
+        in order, so the same step is not taken twice; each load measures its step from its
+        own anchor, exact for one steered load and an approximation for several. A
+        measured-only load is allowed nothing, so its start counts as house until its
+        sensor follows: the safe side. Without a grid power the history starts over: a
+        reading from before an outage is not paired with one after it.
         """
         if grid is None:
+            self._grid_history.clear()
             return powers
         lag = min(timedelta(seconds=LAG_S), self._max_age)
         history = self._grid_history
@@ -417,7 +424,8 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
             step = 0.0 if before is None else grid - before[1]
             allowed, p_min = before[2].get(load.subentry_id, (0.0, 0.0)) if before else (0, 0)
             idle = power <= load.params.charging_threshold_w
-            if step > 0 and not (idle and step - rise < p_min / 2):
+            starting = not idle or (step - rise >= p_min / 2 and self._may_start(load, start))
+            if step > 0 and starting:
                 may_add = max(allowed - power, 0.0)
                 take = min(max(step - rise, 0.0), may_add)
                 rise += take
@@ -429,6 +437,13 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
             paired.append(power)
         return paired
 
+    def _may_start(self, load: Load, start: datetime) -> bool:
+        """Whether an idle load can start: its demand is not off, or its claim did not lapse."""
+        if load.demand_entity:
+            state = self.hass.states.get(load.demand_entity)
+            return state is None or state.state != STATE_OFF
+        return start != self._claim_window or load.subentry_id not in self._claim_lapsed
+
     def _claims(self, load: Load, start: datetime, now: datetime) -> bool:
         """Whether an idle load that may start keeps its room from the loads after it.
 
@@ -438,8 +453,7 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
         starts.
         """
         if load.demand_entity:
-            state = self.hass.states.get(load.demand_entity)
-            return state is None or state.state != STATE_OFF
+            return self._may_start(load, start)
         if start != self._claim_window:
             self._claim_window = start
             self._claim_started.clear()

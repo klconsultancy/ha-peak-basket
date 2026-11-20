@@ -195,15 +195,23 @@ when Home Assistant is away. Push adapters (a mapping from the advice to a `numb
   at most the **lag limit** back: 45 s, never more than the maximum age. A grid rise since
   then is the load's, up to what it was allowed on top of its reading at that moment; for
   an idle load only from half its minimum power, since it starts at least at its minimum.
+  An idle load takes a rise only while it can start: its demand entity is not off, or,
+  without one, its claim has not lapsed; so a car that is not plugged in takes no kettle.
   A grid drop since then is the load's, down to 0 W. The rest is the house's, and loads go
   in priority order, so a step is not taken twice. The anchor slides: a reading older than
   the lag limit is paired with the grid of the lag limit ago, so a load whose sensor writes
   only on a change still starts cleanly, and a real change of the house shows within the
-  lag limit. Limits: a load sensor slower than the lag limit still shows its start as
+  lag limit. Without a fresh grid power the history starts over, so a reading from before
+  a meter outage is never paired with one after it. Limits: a load sensor slower than the lag limit still shows its start as
   house; a measured-only load is allowed nothing, so its start counts as house (and its
   grid import is a little low) until its sensor follows, the safe side; and a house rise
   of half an idle load's minimum or more, while that load may start, counts as the load's
-  for up to the lag limit. The load's **Power** sensor shows the paired power.
+  for up to the lag limit. A charging load takes a house rise up to what it may add on
+  top of its reading (a kettle between two charger readings goes to the charger for up to
+  the sensor's interval); the basket is not affected, it counts the grid, only the split
+  of the import over the house and the load. Each load measures its step from its own
+  anchor: exact for one steered load, an approximation for several that start together.
+  The load's **Power** sensor shows the paired power.
 - **Phase voltages.** Per phase, the load's voltage, then the meter's, then 230 V. A
   voltage of 180 V or less counts as missing. They set the load's minimum (6 A) and maximum
   (16 A) power.

@@ -6,11 +6,13 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from .conftest import GRID, IMPORT, set_sources, setup_entry, tick, value
+from .conftest import GRID, IMPORT, SOURCES, set_sources, setup_entry, tick, value
 
 if TYPE_CHECKING:
     from freezegun.api import FrozenDateTimeFactory
     from homeassistant.core import HomeAssistant
+
+PLUGGED_IN = "binary_sensor.ev_plugged_in"
 
 
 async def _meter(
@@ -23,11 +25,18 @@ async def _meter(
     await tick(hass)
 
 
-async def _start(hass: HomeAssistant, freezer: FrozenDateTimeFactory, ev_w: float) -> None:
-    """House 1000 W and the EV at ``ev_w``, 1 s into the 03:15 window."""
+async def _start(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory, ev_w: float, plugged_in: str = ""
+) -> None:
+    """House 1000 W and the EV at ``ev_w``, 1 s into the 03:15 window.
+
+    ``plugged_in`` is the state of the EV's demand entity; without one, the EV has none.
+    """
     freezer.move_to("2026-11-15T03:14:59+00:00")
     set_sources(hass, 1000 + ev_w, 100.0, ev_w)
-    await setup_entry(hass)
+    if plugged_in:
+        hass.states.async_set(PLUGGED_IN, plugged_in)
+    await setup_entry(hass, {**SOURCES, "demand": PLUGGED_IN} if plugged_in else None)
     freezer.move_to("2026-11-15T03:15:01+00:00")
     set_sources(hass, 1000 + ev_w, 100.0, ev_w)
     await tick(hass)
@@ -94,9 +103,11 @@ async def test_a_sensor_that_reports_the_same_value_lets_the_house_follow(
     assert float(value(hass, "house_power")) == pytest.approx(0, abs=10)
 
 
-async def _silent_idle(hass: HomeAssistant, freezer: FrozenDateTimeFactory) -> None:
+async def _silent_idle(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory, plugged_in: str = "on"
+) -> None:
     """The EV's sensor writes only on a change: silent at 0 W for ten minutes."""
-    await _start(hass, freezer, 0)
+    await _start(hass, freezer, 0, plugged_in)
     for minute in range(16, 26):
         await _meter(hass, freezer, f"2026-11-15T03:{minute}:00+00:00", 1000)
     assert float(value(hass, "house_power")) == pytest.approx(1000, abs=10)
@@ -121,3 +132,34 @@ async def test_a_sensor_slower_than_the_lag_limit_counts_as_house(
     await _meter(hass, freezer, "2026-11-15T03:25:10+00:00", 5140)
     await _meter(hass, freezer, "2026-11-15T03:26:00+00:00", 5140)
     assert float(value(hass, "house_power")) == pytest.approx(5140, abs=10)
+
+
+async def test_an_idle_load_that_cannot_start_takes_no_rise(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    """No car plugged in: an oven, a kettle and a hob are the house's, not the EV's."""
+    await _start(hass, freezer, 0, plugged_in="off")
+    await _meter(hass, freezer, "2026-11-15T03:15:06+00:00", 3500)
+    assert float(value(hass, "house_power")) == pytest.approx(3500, abs=10)
+    assert float(value(hass, "power")) == 0
+
+
+async def test_without_demand_an_idle_load_takes_no_rise_once_its_claim_lapsed(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    """Without a demand entity, an idle load may start only for its reaction time (90 s)."""
+    await _silent_idle(hass, freezer, plugged_in="")
+    await _meter(hass, freezer, "2026-11-15T03:25:10+00:00", 3500)
+    assert float(value(hass, "house_power")) == pytest.approx(3500, abs=10)
+
+
+async def test_after_a_meter_outage_a_step_is_the_house_s(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    """The grid before the outage is minutes old: no load's start to pair it with."""
+    await _start(hass, freezer, 0, plugged_in="on")
+    freezer.move_to("2026-11-15T03:20:00+00:00")
+    await tick(hass)
+    assert value(hass, "mode") == "fallback"
+    await _meter(hass, freezer, "2026-11-15T03:20:05+00:00", 4000)
+    assert float(value(hass, "house_power")) == pytest.approx(4000, abs=10)
