@@ -281,7 +281,8 @@ e_rest = goal x window - used energy           # J left in the basket
 p_avg  = e_rest / max(rest, 1)                 # average allowed for the rest of the window
 p_min  = 6 A x sum(V),  p_max = 16 A x sum(V)
 
-if p_avg - house >= p_min:                     # CONTINUOUS
+band = 200 if the previous mode was pulse else 0
+if p_avg - house >= p_min + band:              # CONTINUOUS
     limit = min(p_avg, house + p_max)
     base  = max(goal, house + p_min)
     last 300 s: limit <= base + extra_a x sum(V)   # no sprint at the end
@@ -293,6 +294,19 @@ else:                                          # PULSE
     on:  limit = house + p_min + 200           when e_load > threshold
     off: limit = house
 ```
+
+The **band** keeps the mode from flipping on every evaluation while the house hovers
+around the continuous boundary: on that boundary the limit jumps (pulse on gives
+`house + p_min + 200`, continuous `p_avg`), and a consumer acts on each jump. Leaving
+continuous stays immediate, the safe side: continuous never holds while the budget no
+longer covers the minimum. Coming back from pulse needs the pulse headroom on top of the
+minimum, and that is why the band equals the headroom: at the return threshold,
+`p_avg = house + p_min + 200`, continuous's limit is exactly the pulse-on limit, so the
+return does not jump (outside the window's last 90 s, where the final cap can bind).
+Leaving continuous still steps once (to pulse on or to the house). A band decoupled from
+`pulse_headroom_w` would bring the jump on return back. The previous mode is an input
+(`previous_mode`), so the model stays pure; without it (the first evaluation, after
+fallback) the boundary is plain, as in the Jinja macro the parity test holds the model to.
 
 The output is the total grid limit (`limit`), the load's allowed power (`limit - house`),
 the minutes the load can still run, and the basket fields:

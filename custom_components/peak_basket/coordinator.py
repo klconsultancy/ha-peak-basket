@@ -224,6 +224,9 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
         self._grid_history: deque[tuple[datetime, float, dict[str, tuple[float, float]]]] = deque()
         # Per steered load: its allowed power and its minimum power.
         self._allowed: dict[str, tuple[float, float]] = {}
+        # Each steered load's mode of the previous evaluation, for the band around the
+        # continuous boundary.
+        self._modes: dict[str, Mode] = {}
         # The window and its import from the meter's average, last taken as it was.
         self._average_used: tuple[datetime, float] | None = None
         self._unsubs: list[CALLBACK_TYPE] = []
@@ -335,6 +338,7 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
                     voltages=voltages or None,
                     other_loads_w=sum(powers[k + 1 : len(self.steered)]),
                     reserved_w=claimed,
+                    previous_mode=self._modes.get(load.subentry_id),
                 ),
                 self.profile,
                 load.params,
@@ -352,6 +356,7 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
         self._allowed = {
             key: (result.allowed_load_w, result.p_load_min_w) for key, result in results.items()
         }
+        self._modes = {key: result.mode for key, result in results.items()}
         pv = 0.0
         if pv_entity := self._src.get(CONF_PV_POWER):
             # Missing or stale PV counts as 0 W, like a load's power: an inverter that
