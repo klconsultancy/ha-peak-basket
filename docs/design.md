@@ -302,12 +302,13 @@ continuous stays immediate, the safe side: continuous never holds while the budg
 longer covers the minimum. Coming back from pulse needs the pulse headroom on top of the
 minimum, and that is why the band equals the headroom: at the return threshold,
 `p_avg = house + p_min + 200`, continuous's limit is exactly the pulse-on limit, so the
-return does not jump (outside the window's last 90 s, where the final cap can bind).
-Leaving continuous still steps once (to pulse on or to the house). A band decoupled from
-`pulse_headroom_w` would bring the jump on return back. The previous mode is an input
-(`previous_mode`), so the model stays pure; without it (the first evaluation, after
-fallback) the boundary is plain, as in the Jinja macro the parity test holds the model to.
-
+return does not jump (except in the window's last minutes, where a cap can bind: the final
+cap in the last 90 s, and the catch-up cap in the last 300 s when `extra_a × sum(V)` is
+below the pulse headroom). Leaving continuous still steps once (to pulse on or to the
+house). A band decoupled from `pulse_headroom_w` would bring the jump on return back. The
+previous mode is an input (`previous_mode`), so the model stays pure; without it (the
+first evaluation, after fallback) the boundary is plain, as in the Jinja macro the parity
+test holds the model to.
 The output is the total grid limit (`limit`), the load's allowed power (`limit - house`),
 the minutes the load can still run, and the basket fields:
 
