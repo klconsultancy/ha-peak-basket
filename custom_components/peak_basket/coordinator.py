@@ -283,7 +283,8 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
         now = dt_util.now()
         start = window_start(now, self.profile.window_s)
         seconds = (now - start).total_seconds()
-        used_wh = self._used_wh(start, now)
+        grid = self._power_w(self._entity(CONF_GRID_POWER), now)
+        used_wh = self._used_wh(start, now, grid)
         cap_wh = seconds * MAX_GRID_POWER_W / SECONDS_PER_HOUR
         if used_wh is not None and used_wh > cap_wh:
             # More than any grid connection can import since the boundary: a reading that
@@ -296,7 +297,6 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
             month_peak = self._power_w(str(peak_entity), now, check_age=False)
         self.target_w = compute_target(self.profile, self.peak_goal_w, month_peak)
 
-        grid = self._power_w(self._entity(CONF_GRID_POWER), now)
         meter = [self._number(e, now) for e in self._entities(CONF_METER_VOLTAGES)]
         # A load's power that is missing or too old counts as 0 W. Many sources only write
         # a change, so a load at rest goes stale; waiting for it would lock the load out.
@@ -562,19 +562,20 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
             load_grid=load_grid,
         )
 
-    def _used_wh(self, start: datetime, now: datetime) -> float | None:
+    def _used_wh(self, start: datetime, now: datetime, grid: float | None) -> float | None:
         """Return the grid import since the window start.
 
         Preferred: the meter's running window average (DSMR 1.4.0, HomeWizard's
         average demand), which is energy so far over the window length, so it survives a
         restart. Otherwise: the difference of the import register since the window start.
+        Either one is as old as its last report: the grid power adds the import since.
         """
         if avg_entity := self._src.get(CONF_WINDOW_AVERAGE):
             state = self._fresh_state(str(avg_entity), now)
             if state is not None and state.last_reported < start:
                 # The meter resets its average a second or two after the boundary; until
-                # then it shows the previous window's. Next to nothing is used this early.
-                return 0.0
+                # then it shows the previous window's.
+                return self._since_report(state, start, now, grid)
             avg = self._power_w(str(avg_entity), now)
             if avg is None:
                 return None
@@ -596,10 +597,29 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
                 )
                 return last[1]
             self._average_used = (start, used)
-            return used
+            return used + self._since_report(state, start, now, grid)
 
-        reading = self._energy_wh(self._entity(CONF_GRID_IMPORT_ENERGY), now)
-        return self._import.since_start(start, now, reading, self._max_age)
+        entity_id = self._entity(CONF_GRID_IMPORT_ENERGY)
+        reading = self._energy_wh(entity_id, now)
+        counted = self._import.since_start(start, now, reading, self._max_age)
+        if counted is None:
+            return None
+        # The start value is the last reading before the boundary: count from that one too.
+        return counted + self._since_report(self.hass.states.get(entity_id), None, now, grid)
+
+    @staticmethod
+    def _since_report(
+        state: State | None, start: datetime | None, now: datetime, grid: float | None
+    ) -> float:
+        """Return the import since the energy reading, at the grid power, in Wh.
+
+        A meter writes its power and its energy one after the other, and the energy may
+        report less often: an evaluation on the power alone would see too little used.
+        """
+        if state is None or grid is None:
+            return 0.0
+        since = state.last_reported if start is None else max(state.last_reported, start)
+        return max(grid, 0.0) * max((now - since).total_seconds(), 0.0) / SECONDS_PER_HOUR
 
     def _entity(self, key: str) -> str:
         return str(self._src[key])
