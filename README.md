@@ -311,6 +311,7 @@ What took trial and error with apexcharts-card 2.2.3:
 | The sensors are **unavailable** for a few seconds after a restart | That is on purpose: the meter has not reported yet, and its fallback would tell the load 0 W. Your consumer uses its own default (EVCC the `//` value of its `jq`). After the maximum age of a reading without the meter, Peak Basket goes to **Safe mode**. |
 | The connection's **Grid import** does not drop to about 0 at a window start | The window average sensor does not cover the region's window. Use the meter's quarter-hour average, or the import counter. |
 | **Window budget** never changes | That is right: it changes only when the peak goal changes, or when the monthly peak passes it. Watch **Grid import** and **Budget left**. |
+| The load stops right after it starts, and starts again | Its power sensor may be slower than 45 s: a start then shows as house until the sensor follows. Pick a sensor that reports more often. A sensor up to 45 s behind the grid power is fine: Peak Basket counts a step on the grid as the load's until its sensor catches up, so the load's **Power** can briefly differ from its own sensor. |
 | The load stops at the end of every window | **Pulse – off** means the budget is used up. Lower the house load at that time, or raise the peak goal. |
 
 ## Reporting a problem

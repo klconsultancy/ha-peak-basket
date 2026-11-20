@@ -83,6 +83,12 @@ count it as house, while the load has demand.
 connected, thermostat calling for heat). Only matters with more than one load. Without one,
 an idle load's claim lasts its reaction time.
 
+**Stale reading, lagging reading** (never in the UI)
+: Stale: older than the maximum age of a reading; a stale grid power puts the loads in safe
+mode, a stale load power counts as 0 W. Lagging: fresh, but behind the grid power (a load
+sensor every 30 s, the meter every 5 s); within the **lag limit** (45 s) a grid step since
+the load's reading counts as the load's start or stop.
+
 **Mode**
 : Continuous (budget for the load's minimum power until the window ends), pulse on (a burst
 at minimum power fits), pulse off (only the house fits) or fallback (*Safe mode*, *Veilige stand*: inputs missing

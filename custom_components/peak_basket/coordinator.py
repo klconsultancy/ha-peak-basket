@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from functools import partial
@@ -81,6 +82,9 @@ SECONDS_PER_HOUR = 3600
 # A generous physical bound on any grid connection's import: 3 x 230 V x 100 A.
 MAX_GRID_POWER_W = 3 * 230 * 100
 POWER_STEP_W = 10
+# The slowest load sensor Peak Basket waits for: a grid step this recent can still be a
+# load's start or stop that its sensor has not reported yet.
+LAG_S = 45
 
 
 def floor_power(value: float) -> float:
@@ -215,6 +219,11 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
         self._sums: dict[str, float] = {}
         self._sums_window = window
         self._last_powers: tuple[datetime, list[float | None]] | None = None
+        # The grid power over the lag limit, to pair a load's reading with the grid's of
+        # the same moment, with what each steered load was allowed then; and last allowed.
+        self._grid_history: deque[tuple[datetime, float, dict[str, tuple[float, float]]]] = deque()
+        # Per steered load: its allowed power and its minimum power.
+        self._allowed: dict[str, tuple[float, float]] = {}
         # The window and its import from the meter's average, last taken as it was.
         self._average_used: tuple[datetime, float] | None = None
         self._unsubs: list[CALLBACK_TYPE] = []
@@ -292,6 +301,7 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
         # does not produce power, so a negative reading (a meter's standby offset) counts
         # as 0 W too: the engine, the sums and the reserves then all see the same powers.
         powers = [max(self._power_w(load.power_entity, now) or 0.0, 0.0) for load in self.loads]
+        powers = self._paired(powers, grid, now)
 
         connection = evaluate(
             ModelInput(
@@ -339,6 +349,9 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
                 # loads after it must not count on the same room.
                 claimed += result.allowed_load_w
 
+        self._allowed = {
+            key: (result.allowed_load_w, result.p_load_min_w) for key, result in results.items()
+        }
         pv = 0.0
         if pv_entity := self._src.get(CONF_PV_POWER):
             # Missing or stale PV counts as 0 W, like a load's power: an inverter that
@@ -373,6 +386,48 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
         if self._must_publish(data, now, force=force):
             self._published_at = now
             self.async_set_updated_data(data)
+
+    def _paired(self, powers: list[float], grid: float | None, now: datetime) -> list[float]:
+        """Take a grid step since a load's last reading as the load's, within limits.
+
+        A load's sensor can lag the grid power: a start or a stop shows on the grid first.
+        Each reading is paired with the grid power of its own moment, at most the lag
+        limit back. A rise since then is the load's up to what it was allowed on top of
+        its reading at that moment (not now: a rise taken as house lowers what it is allowed),
+        and, for an idle load, only from half its minimum power: it starts at least at its
+        minimum, so a smaller rise is the house's (a meter may catch a start half-way).
+        A drop is the load's down to 0 W; the rest is the house's. Loads go
+        in order, so the same step is not taken twice. A measured-only load is allowed
+        nothing, so its start counts as house until its sensor follows: the safe side.
+        """
+        if grid is None:
+            return powers
+        lag = min(timedelta(seconds=LAG_S), self._max_age)
+        history = self._grid_history
+        history.append((now, grid, self._allowed))
+        while len(history) > 1 and history[1][0] <= now - lag:
+            history.popleft()
+        rise = drop = 0.0
+        paired: list[float] = []
+        for load, reading in zip(self.loads, powers, strict=True):
+            power = reading
+            state = self.hass.states.get(load.power_entity)
+            anchor = max(state.last_reported, now - lag) if state else now - lag
+            before = next((entry for entry in reversed(history) if entry[0] <= anchor), None)
+            step = 0.0 if before is None else grid - before[1]
+            allowed, p_min = before[2].get(load.subentry_id, (0.0, 0.0)) if before else (0, 0)
+            idle = power <= load.params.charging_threshold_w
+            if step > 0 and not (idle and step - rise < p_min / 2):
+                may_add = max(allowed - power, 0.0)
+                take = min(max(step - rise, 0.0), may_add)
+                rise += take
+                power += take
+            elif step < 0:
+                take = min(max(-step - drop, 0.0), power)
+                drop += take
+                power -= take
+            paired.append(power)
+        return paired
 
     def _claims(self, load: Load, start: datetime, now: datetime) -> bool:
         """Whether an idle load that may start keeps its room from the loads after it.
