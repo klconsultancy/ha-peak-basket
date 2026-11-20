@@ -103,11 +103,12 @@ async def test_a_sensor_that_reports_the_same_value_lets_the_house_follow(
     assert float(value(hass, "house_power")) == pytest.approx(0, abs=10)
 
 
-async def _silent_idle(
-    hass: HomeAssistant, freezer: FrozenDateTimeFactory, plugged_in: str = "on"
-) -> None:
-    """The EV's sensor writes only on a change: silent at 0 W for ten minutes."""
-    await _start(hass, freezer, 0, plugged_in)
+async def _silent_idle(hass: HomeAssistant, freezer: FrozenDateTimeFactory) -> None:
+    """The EV's sensor writes only on a change: silent at 0 W for ten minutes.
+
+    Without a demand entity, so its claim has long lapsed: it can still start.
+    """
+    await _start(hass, freezer, 0)
     for minute in range(16, 26):
         await _meter(hass, freezer, f"2026-11-15T03:{minute}:00+00:00", 1000)
     assert float(value(hass, "house_power")) == pytest.approx(1000, abs=10)
@@ -142,15 +143,6 @@ async def test_an_idle_load_that_cannot_start_takes_no_rise(
     await _meter(hass, freezer, "2026-11-15T03:15:06+00:00", 3500)
     assert float(value(hass, "house_power")) == pytest.approx(3500, abs=10)
     assert float(value(hass, "power")) == 0
-
-
-async def test_without_demand_an_idle_load_takes_no_rise_once_its_claim_lapsed(
-    hass: HomeAssistant, freezer: FrozenDateTimeFactory
-) -> None:
-    """Without a demand entity, an idle load may start only for its reaction time (90 s)."""
-    await _silent_idle(hass, freezer, plugged_in="")
-    await _meter(hass, freezer, "2026-11-15T03:25:10+00:00", 3500)
-    assert float(value(hass, "house_power")) == pytest.approx(3500, abs=10)
 
 
 async def test_after_a_meter_outage_a_step_is_the_house_s(

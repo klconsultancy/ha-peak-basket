@@ -195,12 +195,17 @@ when Home Assistant is away. Push adapters (a mapping from the advice to a `numb
   at most the **lag limit** back: 45 s, never more than the maximum age. A grid rise since
   then is the load's, up to what it was allowed on top of its reading at that moment; for
   an idle load only from half its minimum power, since it starts at least at its minimum.
-  An idle load takes a rise only while it can start: its demand entity is not off, or,
-  without one, its claim has not lapsed; so a car that is not plugged in takes no kettle.
+  An idle load takes a rise unless its demand entity is off: with "car plugged in" off, a
+  kettle stays the house's. Without a demand entity Peak Basket cannot tell a car about to
+  start from no car, so a house rise of half the load's minimum or more counts as the
+  load's for up to the lag limit, also with no car. That only moves the split of the
+  import over the house and the load, not the basket, which counts the grid; a start taken
+  as house would stop the load again, which is the loop this rule is for. A demand entity
+  makes the split exact.
   A grid drop since then is the load's, down to 0 W. The rest is the house's, and loads go
   in priority order, so a step is not taken twice. The anchor slides: a reading older than
   the lag limit is paired with the grid of the lag limit ago, so a load whose sensor writes
-  only on a change still starts cleanly, and a real change of the house shows within the
+  only on a change still starts cleanly (unless its demand entity is off), and a real change of the house shows within the
   lag limit. Without a fresh grid power the history starts over, so a reading from before
   a meter outage is never paired with one after it. Limits: a load sensor slower than the lag limit still shows its start as
   house; a measured-only load is allowed nothing, so its start counts as house (and its

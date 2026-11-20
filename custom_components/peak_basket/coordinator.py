@@ -301,7 +301,7 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
         # does not produce power, so a negative reading (a meter's standby offset) counts
         # as 0 W too: the engine, the sums and the reserves then all see the same powers.
         powers = [max(self._power_w(load.power_entity, now) or 0.0, 0.0) for load in self.loads]
-        powers = self._paired(powers, grid, start, now)
+        powers = self._paired(powers, grid, now)
 
         connection = evaluate(
             ModelInput(
@@ -387,9 +387,7 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
             self._published_at = now
             self.async_set_updated_data(data)
 
-    def _paired(
-        self, powers: list[float], grid: float | None, start: datetime, now: datetime
-    ) -> list[float]:
+    def _paired(self, powers: list[float], grid: float | None, now: datetime) -> list[float]:
         """Take a grid step since a load's last reading as the load's, within limits.
 
         A load's sensor can lag the grid power: a start or a stop shows on the grid first.
@@ -424,7 +422,7 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
             step = 0.0 if before is None else grid - before[1]
             allowed, p_min = before[2].get(load.subentry_id, (0.0, 0.0)) if before else (0, 0)
             idle = power <= load.params.charging_threshold_w
-            starting = not idle or (step - rise >= p_min / 2 and self._may_start(load, start))
+            starting = not idle or (step - rise >= p_min / 2 and self._may_start(load))
             if step > 0 and starting:
                 may_add = max(allowed - power, 0.0)
                 take = min(max(step - rise, 0.0), may_add)
@@ -437,12 +435,17 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
             paired.append(power)
         return paired
 
-    def _may_start(self, load: Load, start: datetime) -> bool:
-        """Whether an idle load can start: its demand is not off, or its claim did not lapse."""
-        if load.demand_entity:
-            state = self.hass.states.get(load.demand_entity)
-            return state is None or state.state != STATE_OFF
-        return start != self._claim_window or load.subentry_id not in self._claim_lapsed
+    def _may_start(self, load: Load) -> bool:
+        """Whether an idle load can start: only a demand entity that is off says it cannot.
+
+        Without one, Peak Basket cannot tell a car about to start from no car, and a start
+        taken as house is what stops the load again; a house rise taken as the load's only
+        moves the split of the import, not the basket.
+        """
+        if not load.demand_entity:
+            return True
+        state = self.hass.states.get(load.demand_entity)
+        return state is None or state.state != STATE_OFF
 
     def _claims(self, load: Load, start: datetime, now: datetime) -> bool:
         """Whether an idle load that may start keeps its room from the loads after it.
@@ -453,7 +456,8 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
         starts.
         """
         if load.demand_entity:
-            return self._may_start(load, start)
+            state = self.hass.states.get(load.demand_entity)
+            return state is None or state.state != STATE_OFF
         if start != self._claim_window:
             self._claim_window = start
             self._claim_started.clear()
