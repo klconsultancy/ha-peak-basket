@@ -53,7 +53,7 @@
           "extra_a": "Catch-up current, last 5 minutes"
         },
         "data_description": {
-          "demand": "Only needed with more than one load. An entity that is on while this load wants power, such as the “vehicle connected” sensor of a charger or a thermostat calling for heat. While it is on, Peak Basket keeps budget for this load even before it draws anything, so the loads after it cannot use that budget. Without it, that reservation lasts the reaction time.",
+          "demand": "Recommended for a charger. An entity that is on while this load wants power, such as the “vehicle connected” sensor of a charger or a thermostat calling for heat. Without it, a rise in the house's power while this load is idle can count as this load's for up to 45 s, also with no car plugged in. With more than one load, Peak Basket also keeps budget for this load while that entity is on, even before it draws anything, so the loads after it cannot use that budget; without it, that reservation lasts the reaction time.",
           "voltages": "Measured voltage per phase at the load, in order L1, L2, L3. With the minimum and maximum current they set its power range. Without them: the meter's voltage, else 230 V.",
           "reaction_s": "Time between a lower limit and the load actually dropping (e.g. EVCC ≈ 20 s + 30 s cache).",
           "min_charge_s": "When there is not enough for the whole window, the load only starts when budget for at least this long is left.",
@@ -144,7 +144,7 @@
             "extra_a": "Catch-up current, last 5 minutes"
           },
           "data_description": {
-            "demand": "Only needed with more than one load. An entity that is on while this load wants power, such as the “vehicle connected” sensor of a charger or a thermostat calling for heat. While it is on, Peak Basket keeps budget for this load even before it draws anything, so the loads after it cannot use that budget. Without it, that reservation lasts the reaction time.",
+            "demand": "Recommended for a charger. An entity that is on while this load wants power, such as the “vehicle connected” sensor of a charger or a thermostat calling for heat. Without it, a rise in the house's power while this load is idle can count as this load's for up to 45 s, also with no car plugged in. With more than one load, Peak Basket also keeps budget for this load while that entity is on, even before it draws anything, so the loads after it cannot use that budget; without it, that reservation lasts the reaction time.",
             "voltages": "Measured voltage per phase at the load, in order L1, L2, L3. With the minimum and maximum current they set its power range. Without them: the meter's voltage, else 230 V.",
             "reaction_s": "Time between a lower limit and the load actually dropping (e.g. EVCC ≈ 20 s + 30 s cache).",
             "min_charge_s": "When there is not enough for the whole window, the load only starts when budget for at least this long is left.",
@@ -179,7 +179,7 @@
             "extra_a": "Catch-up current, last 5 minutes"
           },
           "data_description": {
-            "demand": "Only needed with more than one load. An entity that is on while this load wants power, such as the “vehicle connected” sensor of a charger or a thermostat calling for heat. While it is on, Peak Basket keeps budget for this load even before it draws anything, so the loads after it cannot use that budget. Without it, that reservation lasts the reaction time.",
+            "demand": "Recommended for a charger. An entity that is on while this load wants power, such as the “vehicle connected” sensor of a charger or a thermostat calling for heat. Without it, a rise in the house's power while this load is idle can count as this load's for up to 45 s, also with no car plugged in. With more than one load, Peak Basket also keeps budget for this load while that entity is on, even before it draws anything, so the loads after it cannot use that budget; without it, that reservation lasts the reaction time.",
             "voltages": "Measured voltage per phase at the load, in order L1, L2, L3. With the minimum and maximum current they set its power range. Without them: the meter's voltage, else 230 V.",
             "reaction_s": "Time between a lower limit and the load actually dropping (e.g. EVCC ≈ 20 s + 30 s cache).",
             "min_charge_s": "When there is not enough for the whole window, the load only starts when budget for at least this long is left.",
