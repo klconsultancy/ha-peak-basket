@@ -87,8 +87,11 @@ A HACS install moves to the Marketplace by itself on the first start of 2026.11.
 3. **The first load,** such as the EV charger: its power sensor, its priority and whether
    Peak Basket steers it. A steered load then asks how: its phase voltages (per phase the
    load's voltage is used, else the meter's, else 230 V), its current range, its reaction
-   time and its minimum run time. **Wants power** only matters with more than one load: see
-   [Several loads](#several-loads).
+   time and its minimum run time. **Wants power** is recommended for a charger, such as
+   `binary_sensor.<charger>_connected`: without it, a rise in the house's power while the
+   charger is idle can count as the charger's for up to 45 s, also with no car (only the
+   split of the import, not the basket). With more than one load it also decides who
+   keeps budget: see [Several loads](#several-loads).
 4. **More loads:** **Add load** on the Peak Basket page. **Reconfigure** on a load changes it,
    also from only measured to steered and back: its entity IDs stay.
    **Reconfigure** on the Peak Basket entry changes the grid connection's sensors, such as
@@ -116,7 +119,8 @@ Basket keeps its budget free for a while: the loads after it cannot take it. **W
 - a thermostat or heat pump that calls for heat.
 
 While it is on, the budget stays reserved even if the load draws nothing yet; while it is
-off, the load can still start, but the loads after it may use its budget. Without it, the
+off, the load can still start, but the loads after it may use its budget, and its start
+counts as house until its power sensor follows (so keep the entity accurate). Without it, the
 reservation lasts the load's reaction time. So a car that is not plugged in does not keep
 a boiler after it out all day.
 
@@ -311,6 +315,7 @@ What took trial and error with apexcharts-card 2.2.3:
 | The sensors are **unavailable** for a few seconds after a restart | That is on purpose: the meter has not reported yet, and its fallback would tell the load 0 W. Your consumer uses its own default (EVCC the `//` value of its `jq`). After the maximum age of a reading without the meter, Peak Basket goes to **Safe mode**. |
 | The connection's **Grid import** does not drop to about 0 at a window start | The window average sensor does not cover the region's window. Use the meter's quarter-hour average, or the import counter. |
 | **Window budget** never changes | That is right: it changes only when the peak goal changes, or when the monthly peak passes it. Watch **Grid import** and **Budget left**. |
+| The load stops right after it starts, and starts again | Its power sensor may be slower than 45 s: a start then shows as house until the sensor follows. Pick a sensor that reports more often. A sensor up to 45 s behind the grid power is fine: Peak Basket counts a step on the grid as the load's until its sensor catches up, so the load's **Power** can briefly differ from its own sensor. Give a charger a **Wants power** entity (such as `binary_sensor.<charger>_connected`): then a rise while no car is plugged in is always the house's, not the charger's. |
 | The load stops at the end of every window | **Pulse – off** means the budget is used up. Lower the house load at that time, or raise the peak goal. |
 
 ## Reporting a problem

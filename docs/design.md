@@ -186,6 +186,37 @@ when Home Assistant is away. Push adapters (a mapping from the advice to a `numb
   A negative power (a meter's standby offset) counts as 0 W as well: a load does not
   produce power, and so the engine, the connection's sums and the reserves see the same
   powers.
+- **A lagging reading** is not a stale one: a load's sensor that reports every 30 s is
+  fresh, but behind a grid power that reports every 5 s. A start or a stop then shows on
+  the grid first, and `grid − loads` would take it as a step of the house: a start as a
+  house spike (the load is told to stop, and restarts, in a loop), a stop as a house of 0
+  W (more room than there is). So each load's reading is paired with the grid power of its
+  own moment (`last_reported`, which moves on every write, also of the same value), at
+  most the **lag limit** back: 45 s, never more than the maximum age. A grid rise since
+  then is the load's, up to what it was allowed on top of its reading at that moment; for
+  an idle load only from half its minimum power, since it starts at least at its minimum.
+  An idle load takes a rise unless its demand entity is off: with "car plugged in" off, a
+  kettle stays the house's. Without a demand entity Peak Basket cannot tell a car about to
+  start from no car, so a house rise of half the load's minimum or more counts as the
+  load's for up to the lag limit, also with no car. That only moves the split of the
+  import over the house and the load, not the basket, which counts the grid; a start taken
+  as house would stop the load again, which is the loop this rule is for. A demand entity
+  makes the split exact. A grid drop since then is the load's, down to 0 W. The rest is
+  the house's, and loads go in priority order, so a step is not taken twice. The anchor
+  slides: a reading older than the lag limit is paired with the grid of the lag limit ago,
+  so a load whose sensor writes only on a change still starts cleanly (unless its demand
+  entity is off), and a real change of the house shows within the lag limit. Without a
+  fresh grid power the history starts over, so a reading from before a meter outage is
+  never paired with one after it. Limits: a load sensor slower than the lag limit still
+  shows its start as house; a measured-only load is allowed nothing, so its start counts
+  as house (and its grid import is a little low) until its sensor follows, the safe side;
+  and a house rise of half an idle load's minimum or more, while that load may start,
+  counts as the load's for up to the lag limit. A charging load takes a house rise up to
+  what it may add on top of its reading (a kettle between two charger readings goes to the
+  charger for up to the sensor's interval); the basket is not affected, it counts the
+  grid, only the split of the import over the house and the load. Each load measures its
+  step from its own anchor: exact for one steered load, an approximation for several that
+  start together. The load's **Power** sensor shows the paired power.
 - **Phase voltages.** Per phase, the load's voltage, then the meter's, then 230 V. A
   voltage of 180 V or less counts as missing. They set the load's minimum (6 A) and maximum
   (16 A) power.
