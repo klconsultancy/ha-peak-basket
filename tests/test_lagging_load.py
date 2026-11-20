@@ -155,3 +155,13 @@ async def test_after_a_meter_outage_a_step_is_the_house_s(
     assert value(hass, "mode") == "fallback"
     await _meter(hass, freezer, "2026-11-15T03:20:05+00:00", 4000)
     assert float(value(hass, "house_power")) == pytest.approx(4000, abs=10)
+
+
+async def test_an_idle_load_that_wants_power_takes_its_start(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    """Car plugged in: the 4 kW step is the EV's start, not the house's."""
+    await _start(hass, freezer, 0, plugged_in="on")
+    await _meter(hass, freezer, "2026-11-15T03:15:06+00:00", 5140)
+    assert float(value(hass, "house_power")) == pytest.approx(1000, abs=10)
+    assert float(value(hass, "power")) == pytest.approx(4140, abs=10)
