@@ -83,7 +83,8 @@ after the merge with `git worktree remove .worktrees/<branch>`.
   fallback, never an unlimited one.
 - Internally: W, Wh and seconds.
 - `tests/test_jinja_parity.py` pins the engine to the Jinja template it was ported from.
-  A deliberate change to the decision updates that fixture and says why in the PR.
+  The fixture stays the macro's output. A deliberate change to the decision is stated in
+  that test as a divergence, with its reason and its pinned count, and the PR says why.
 
 ## Home Assistant
 
