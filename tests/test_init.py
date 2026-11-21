@@ -381,7 +381,7 @@ async def test_previous_windows_average_counts_as_nothing_used(
     """
     freezer.move_to("2026-11-15T03:14:57+00:00")
     hass.states.async_set(GRID, "5170", {"unit_of_measurement": "W"})
-    hass.states.async_set(EV, "4070", {"unit_of_measurement": "W"})
+    hass.states.async_set(EV, "4270", {"unit_of_measurement": "W"})
     hass.states.async_set(AVERAGE, "5300", {"unit_of_measurement": "W"})
     sources: dict[str, Any] = {**SOURCES, "window_average": AVERAGE}
     del sources["grid_import_energy"]
@@ -415,7 +415,7 @@ async def test_an_old_average_reported_after_the_boundary_is_capped(
     """
     freezer.move_to("2026-11-15T03:14:57+00:00")
     hass.states.async_set(GRID, "5170", {"unit_of_measurement": "W"})
-    hass.states.async_set(EV, "4070", {"unit_of_measurement": "W"})
+    hass.states.async_set(EV, "4270", {"unit_of_measurement": "W"})
     hass.states.async_set(AVERAGE, "5300", {"unit_of_measurement": "W"})
     sources: dict[str, Any] = {**SOURCES, "window_average": AVERAGE}
     del sources["grid_import_energy"]

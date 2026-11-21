@@ -92,7 +92,7 @@ sensor every 30 s, the meter every 5 s); within the **lag limit** (45 s) a grid 
 the load's reading counts as the load's start or stop.
 
 **Mode**
-: Continuous (budget for the load's minimum power until the window ends), pulse on (a burst
+: Continuous (budget for the load's minimum power plus 200 W until the window ends), pulse on (a burst
 at minimum power fits), pulse off (only the house fits) or fallback (*Safe mode*, *Veilige stand*: inputs missing
 or stale, a static limit at the steering limit).
 

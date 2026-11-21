@@ -26,8 +26,8 @@ steered load) + reserve = window budget.
 
 | Mode | When | The load may draw |
 |---|---|---|
-| **Continuous** | The budget left covers at least the load's minimum power until the window ends | Up to what keeps the window's average at the peak limit minus the safety margin |
-| **Pulse – on** | Not enough for that, but enough for a burst at minimum power | Its minimum power, for as long as the budget lasts |
+| **Continuous** | The budget left covers at least the load's minimum power plus 200 W until the window ends | Up to what keeps the window's average at the peak limit minus the safety margin |
+| **Pulse – on** | Not enough for that, but enough for a burst at minimum power | Its minimum power plus 200 W, for as long as the budget lasts |
 | **Pulse – off** | The budget for this window is used up | Nothing: only the house fits |
 | **Safe mode** | A source is missing or too old | A static limit at the peak limit minus the safety margin, never "unlimited" |
 
