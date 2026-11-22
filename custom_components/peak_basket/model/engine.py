@@ -59,6 +59,9 @@ class ModelParams:
     """Measured load power above which the load counts as running."""
     min_valid_voltage: float = 180.0
     """Phase voltages at or below this are treated as missing."""
+    house_recent_s: float = 30.0
+    """How long a higher house holds the mode down, so a cycling appliance does not flip
+    it; about what a consumer needs to act on a higher limit (EVCC: ~20 s plus its cache)."""
 
 
 @dataclass(frozen=True)
@@ -89,6 +92,11 @@ class ModelInput:
     evaluation around a boundary: from pulse off, pulse on needs the house the pulse
     headroom below the start, for the rest of the window. ``None`` (and fallback) decides
     without that band."""
+    house_recent_w: float | None = None
+    """The highest house this load's evaluations saw over the last ``house_recent_s``. The
+    mode is decided on the higher of it and the house of now, the limit on the house of
+    now: a cycling appliance cannot flip the mode up, a rise still takes it down at once.
+    ``None`` decides on the house of now."""
 
 
 @dataclass(frozen=True)
@@ -195,7 +203,10 @@ def evaluate(
     # plus the pulse headroom. There continuous's limit p_avg is pulse on's limit, so
     # crossing the boundary either way does not move the limit.
     p_floor = p_min + params.pulse_headroom_w
-    if p_avg - house >= p_floor:
+    # The mode on the highest recent house, the limit on the house of now.
+    house_mode = max(house, inp.house_recent_w or 0.0)
+    e_load_mode = e_rest - house_mode * rest
+    if p_avg - house_mode >= p_floor:
         mode = Mode.CONTINUOUS
         limit = min(p_avg, house + p_max)
         base = max(goal, house + p_floor)
@@ -212,10 +223,10 @@ def evaluate(
             # Stopping is immediate, the safe side; starting again needs a band. As a power,
             # since the house's noise moves e_load by the noise times the rest.
             threshold += params.pulse_headroom_w * rest
-        if e_load > threshold:
+        if e_load_mode > threshold:
             mode = Mode.PULSE_ON
             limit = house + p_floor
-            charge_s = min(max(e_load / p_load - params.reaction_s, 0.0), rest)
+            charge_s = min(max(e_load_mode / p_load - params.reaction_s, 0.0), rest)
         else:
             mode = Mode.PULSE_OFF
             limit = house
