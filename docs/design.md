@@ -287,10 +287,9 @@ e_rest = goal x window - used energy           # J left in the basket
 p_avg  = e_rest / max(rest, 1)                 # average allowed for the rest of the window
 p_min  = 6 A x sum(V),  p_max = 16 A x sum(V)
 
-band = 200 if the previous mode was pulse else 0
-if p_avg - house >= p_min + band:              # CONTINUOUS
+if p_avg - house >= p_min + 200:               # CONTINUOUS
     limit = min(p_avg, house + p_max)
-    base  = max(goal, house + p_min)
+    base  = max(goal, house + p_min + 200)
     last 300 s: limit <= base + extra_a x sum(V)   # no sprint at the end
     last 90 s:  limit <= base
 else:                                          # PULSE
@@ -302,29 +301,28 @@ else:                                          # PULSE
     off: limit = house
 ```
 
-The **band** keeps the mode from flipping on every evaluation while the house hovers
-around the continuous boundary: on that boundary the limit jumps (pulse on gives
-`house + p_min + 200`, continuous `p_avg`), and a consumer acts on each jump. Leaving
-continuous stays immediate, the safe side: continuous never holds while the budget no
-longer covers the minimum. Coming back from pulse needs the pulse headroom on top of the
-minimum, and that is why the band equals the headroom: at the return threshold,
-`p_avg = house + p_min + 200`, continuous's limit is exactly the pulse-on limit, so the
-return does not jump (except in the window's last minutes, where a cap can bind: the final
-cap in the last 90 s, and the catch-up cap in the last 300 s when `extra_a × sum(V)` is
-below the pulse headroom). Leaving continuous still steps once (to pulse on or to the
-house). A band decoupled from `pulse_headroom_w` would bring the jump on return back. The
-previous mode is an input (`previous_mode`), so the model stays pure; without it (the
-first evaluation, after fallback) the boundary is plain, as in the Jinja macro the parity
-test holds the model to.
+The **continuous boundary** is the load's minimum plus the pulse headroom, the power pulse
+on gives. Continuous never offers the load less than pulse on: a charger held at its bare
+minimum can stop, as EVCC does when the measured voltages put 6 A below its own 6 A ×
+230 V. On the boundary `p_avg = house + p_min + 200`, so continuous's limit is exactly
+pulse on's, and crossing the boundary either way does not move the limit; the mode may
+follow the house there without a consumer seeing it. With room for the minimum but not
+the headroom the load pulses instead of running through: pulse on asks a little more than
+the room, so it stops about the reaction time before the window ends. That costs a little
+energy; a limit below what the charger accepts would make it stop and restart instead.
+The caps in the last 300 s use the same base, `house + p_min + 200` when that is above the
+goal, so the window's last 90 s never offer less than pulse on either; the limit stays at
+most `p_avg`, so the budget still holds.
 
-The pulse threshold has a band of its own, for the same reason: an idle load waiting
+The pulse threshold has a band: an idle load waiting
 for its start with a steady house keeps `e_load` almost constant (the house's use and its
 reserve shrink alike), so it can sit on the threshold for minutes, and the house's noise
 moves `e_load` by the noise times the time left. Each crossing turns the grid limit from
 the house to `house + p_min + 200` and back, and a consumer without a start delay would
 start and stop on it. Stopping stays immediate, the safe side; from pulse off, pulse on
 needs the house the pulse headroom below the start. As a power, the band holds whatever
-the time left, and it is the same 200 W as on the continuous boundary.
+the time left. The previous mode is an input (`previous_mode`), so the model stays pure;
+without it (the first evaluation, after fallback) the threshold is plain.
 
 The output is the total grid limit (`limit`), the load's allowed power (`limit - house`),
 the minutes the load can still run, and the basket fields:
@@ -362,7 +360,10 @@ Freshness is the test, so a source whose integration restores its last state at 
 (a template or restore sensor) counts as reported before the meter really has.
 
 `tests/test_jinja_parity.py` holds the model to the Jinja template it was ported from:
-6480 cases rendered by Home Assistant itself.
+6480 cases rendered by Home Assistant itself. The model departs from it in two places, the
+continuous boundary and the base of the last 300 s's caps (both the pulse headroom above
+the template's); the test states both and counts the cases, so the fixture stays the
+template's output.
 
 ### Tunables
 

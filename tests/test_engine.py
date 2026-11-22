@@ -135,7 +135,24 @@ class TestDecisions:
     def test_final_90s_capped_at_base(self) -> None:
         res = evaluate(inp(850, 1000, 0, 500), BE_FLANDERS)
         assert res.mode is Mode.CONTINUOUS
-        assert res.limit_w == pytest.approx(max(GOAL, 1000 + P_MIN))
+        assert res.limit_w == pytest.approx(max(GOAL, 1000 + P_MIN + P.pulse_headroom_w))
+
+    def test_final_90s_keep_the_pulse_headroom(self) -> None:
+        """With the house above the goal minus the minimum, the base is the house plus the
+        minimum plus the pulse headroom, not the bare minimum EVCC stops on (#91)."""
+        house = GOAL - P_MIN + 400
+        res = evaluate(inp(850, house + P_MIN, P_MIN, 500), BE_FLANDERS)
+        assert res.mode is Mode.CONTINUOUS
+        assert res.allowed_load_w == pytest.approx(P_MIN + P.pulse_headroom_w)
+
+    def test_final_cap_never_above_the_average(self) -> None:
+        # Room for just the minimum plus the headroom: the cap is p_avg, not above it.
+        house, t = 1000.0, 850.0
+        p_avg = 1000 + P_MIN + P.pulse_headroom_w + 30
+        used_wh = (GOAL * 900 - p_avg * (900 - t)) / 3600
+        res = evaluate(inp(t, house, 0, used_wh), BE_FLANDERS)
+        assert res.mode is Mode.CONTINUOUS
+        assert res.limit_w == pytest.approx(p_avg)
 
     def test_measured_voltage_sets_min_power(self) -> None:
         # 1.2 kW house: continuous at 3x240 V? p_min = 4320; at 3x220 V p_min = 3960.
@@ -377,28 +394,35 @@ def _after(previous: Mode | None, house: float) -> Mode:
     ).mode
 
 
-# Continuous while the budget minus the house covers the load's minimum: house <= 1260 W.
-@pytest.mark.parametrize("previous", [None, Mode.FALLBACK, Mode.CONTINUOUS])
-def test_without_a_pulse_before_the_boundary_is_plain(previous: Mode | None) -> None:
-    assert _after(previous, GOAL - P_MIN) == Mode.CONTINUOUS
-    assert _after(previous, GOAL - P_MIN + 40) == Mode.PULSE_ON
+# Continuous while the budget minus the house covers the load's minimum plus the pulse
+# headroom, whatever the previous mode: house <= 1060 W.
+P_FLOOR = P_MIN + P.pulse_headroom_w
 
 
-@pytest.mark.parametrize("previous", [Mode.PULSE_ON, Mode.PULSE_OFF])
-def test_back_to_continuous_only_with_the_headroom(previous: Mode) -> None:
-    """From pulse, continuous needs the load's minimum plus the pulse headroom (200 W)."""
-    assert _after(previous, GOAL - P_MIN - 40) != Mode.CONTINUOUS
-    assert _after(previous, GOAL - P_MIN - P.pulse_headroom_w) == Mode.CONTINUOUS
+@pytest.mark.parametrize(
+    "previous", [None, Mode.FALLBACK, Mode.CONTINUOUS, Mode.PULSE_ON, Mode.PULSE_OFF]
+)
+def test_the_continuous_boundary_is_the_minimum_plus_the_pulse_headroom(
+    previous: Mode | None,
+) -> None:
+    assert _after(previous, GOAL - P_FLOOR) == Mode.CONTINUOUS
+    assert _after(previous, GOAL - P_FLOOR + 1) != Mode.CONTINUOUS
 
 
-def test_leaving_continuous_is_immediate() -> None:
-    """The safe direction: no band when the budget no longer covers the minimum."""
-    assert _after(Mode.CONTINUOUS, GOAL - P_MIN + 1) == Mode.PULSE_ON
+def test_just_below_the_boundary_the_load_gets_the_pulse_power() -> None:
+    """Room for the minimum but not the headroom: pulse on, not continuous at the room.
+
+    EVCC holds a charger at its minimum current only with some headroom (#91): with the
+    measured voltages the minimum is ~4030 W where EVCC needs 4140 W.
+    """
+    res = evaluate(inp(0, GOAL - P_MIN - 100, 0, 0), BE_FLANDERS)
+    assert res.mode is Mode.PULSE_ON
+    assert res.allowed_load_w == pytest.approx(P_FLOOR)
 
 
-def test_coming_back_from_pulse_on_the_limit_does_not_jump() -> None:
-    """At the return threshold, continuous's limit is the pulse-on limit: the band is the
-    pulse headroom for that reason, not just some hysteresis."""
+@pytest.mark.parametrize("previous", [Mode.CONTINUOUS, Mode.PULSE_ON])
+def test_across_the_boundary_the_limit_does_not_jump(previous: Mode) -> None:
+    """On the boundary continuous's limit p_avg is pulse on's, in both directions."""
 
     def at(house: float) -> ModelResult:
         return evaluate(
@@ -409,16 +433,17 @@ def test_coming_back_from_pulse_on_the_limit_does_not_jump() -> None:
                 load_w=0,
                 window_import_wh=0,
                 voltages=V3,
-                previous_mode=Mode.PULSE_ON,
+                previous_mode=previous,
             ),
             BE_FLANDERS,
         )
 
-    threshold = GOAL - P_MIN - P.pulse_headroom_w
-    pulse, back = at(threshold + 1), at(threshold)
+    boundary = GOAL - P_FLOOR
+    continuous, pulse = at(boundary), at(boundary + 1)
+    assert continuous.mode == Mode.CONTINUOUS
     assert pulse.mode == Mode.PULSE_ON
-    assert back.mode == Mode.CONTINUOUS
-    assert back.limit_w == pytest.approx(pulse.limit_w, abs=1)
+    assert pulse.limit_w == pytest.approx(continuous.limit_w + 1)
+    assert pulse.allowed_load_w == pytest.approx(continuous.allowed_load_w)
 
 
 # An idle load may start with budget for the reaction and minimum run time: 4140 W for

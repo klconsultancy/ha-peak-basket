@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import itertools
 from datetime import timedelta
 from typing import TYPE_CHECKING
 
@@ -17,31 +16,37 @@ if TYPE_CHECKING:
 
 GOAL = 5400.0
 P_MIN = 4140.0
+# The load's minimum plus the pulse headroom: what pulse on gives, continuous at least.
+P_FLOOR = P_MIN + 200
 
 
-async def test_a_house_around_the_boundary_changes_the_mode_once(
+async def test_around_the_continuous_boundary_the_load_keeps_at_least_the_pulse_power(
     hass: HomeAssistant, freezer: FrozenDateTimeFactory
 ) -> None:
-    """The house swings 50 W around the continuous boundary every 5 s, for a minute."""
+    """The house swings 50 W around the continuous boundary every 5 s, for a minute.
+
+    On the boundary continuous's limit is pulse on's, so the mode may follow the house but
+    the load's room only moves with it: never below its minimum plus the pulse headroom,
+    the power EVCC needs to hold the charger (#91).
+    """
     freezer.move_to("2026-11-15T03:14:59+00:00")
     set_sources(hass, 1000, 100.0, 0)
     await setup_entry(hass)
     start = dt_util.parse_datetime("2026-11-15T03:15:00+00:00")
     assert start is not None
-    modes = []
+    allowed = []
     for k in range(1, 13):
         t = 5 * k
         freezer.move_to(start + timedelta(seconds=t))
         # Nothing used yet: the budget's average power over the rest of the window.
-        boundary = GOAL * 900 / (900 - t) - P_MIN
+        boundary = GOAL * 900 / (900 - t) - P_FLOOR
         house = boundary - 50 if k % 2 else boundary + 50
         hass.states.async_set(GRID, str(house), {"unit_of_measurement": "W"})
         hass.states.async_set(IMPORT, "100.0", {"unit_of_measurement": "kWh"})
         await tick(hass)
-        modes.append(value(hass, "mode"))
-    changes = sum(a != b for a, b in itertools.pairwise(modes))
-    assert modes[0] == "continuous"
-    assert changes == 1
+        allowed.append(float(value(hass, "allowed_power")))
+    assert min(allowed) == pytest.approx(P_FLOOR, abs=1)
+    assert max(allowed) == pytest.approx(P_FLOOR + 50, abs=1)
 
 
 # An idle load may start with budget for 4140 W over the reaction and minimum run time.

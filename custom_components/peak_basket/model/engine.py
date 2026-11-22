@@ -23,7 +23,7 @@ class Mode(StrEnum):
     """How the load is driven in the current window."""
 
     CONTINUOUS = "continuous"
-    """Enough budget to keep the load running at or above its minimum."""
+    """Enough budget to keep the load running at or above its minimum plus the headroom."""
     PULSE_ON = "pulse_on"
     """Not enough for continuous; budget left for a burst at minimum power."""
     PULSE_OFF = "pulse_off"
@@ -53,7 +53,8 @@ class ModelParams:
     final_s: float = 90.0
     """Last part of the window in which the limit is capped at the base."""
     pulse_headroom_w: float = 200.0
-    """Added to the minimum load power in pulse mode, so the load surely starts."""
+    """Added to the load's minimum power in pulse on, and to continuous's boundary and the
+    base of its caps, so the load surely starts and holds."""
     charging_threshold_w: float = 100.0
     """Measured load power above which the load counts as running."""
     min_valid_voltage: float = 180.0
@@ -85,9 +86,9 @@ class ModelInput:
     It counts as house, so two loads cannot count on the same room."""
     previous_mode: Mode | None = None
     """The load's mode of the previous evaluation, so the mode does not flip on every
-    evaluation around a boundary. From pulse, continuous needs the pulse headroom on top of
-    the load's minimum; from pulse off, pulse on needs the house the pulse headroom below
-    the start, for the rest of the window. ``None`` (and fallback) decides without either."""
+    evaluation around a boundary: from pulse off, pulse on needs the house the pulse
+    headroom below the start, for the rest of the window. ``None`` (and fallback) decides
+    without that band."""
 
 
 @dataclass(frozen=True)
@@ -190,13 +191,14 @@ def evaluate(
     p_avg = e_rest / max(rest, 1.0)  # no division by zero on the boundary itself
     e_load = e_rest - house * rest  # J left for the load after the house
 
-    # Leaving continuous is immediate, the safe side; coming back from pulse needs a band.
-    pulsing = inp.previous_mode in {Mode.PULSE_ON, Mode.PULSE_OFF}
-    band = params.pulse_headroom_w if pulsing else 0.0
-    if p_avg - house >= p_min + band:
+    # Continuous never offers the load less than pulse on does: its boundary is the minimum
+    # plus the pulse headroom. There continuous's limit p_avg is pulse on's limit, so
+    # crossing the boundary either way does not move the limit.
+    p_floor = p_min + params.pulse_headroom_w
+    if p_avg - house >= p_floor:
         mode = Mode.CONTINUOUS
         limit = min(p_avg, house + p_max)
-        base = max(goal, house + p_min)
+        base = max(goal, house + p_floor)
         if rest <= params.tail_s:
             limit = min(limit, base + params.extra_a * volt_sum)
         if rest <= params.final_s:
@@ -212,7 +214,7 @@ def evaluate(
             threshold += params.pulse_headroom_w * rest
         if e_load > threshold:
             mode = Mode.PULSE_ON
-            limit = house + p_min + params.pulse_headroom_w
+            limit = house + p_floor
             charge_s = min(max(e_load / p_load - params.reaction_s, 0.0), rest)
         else:
             mode = Mode.PULSE_OFF
