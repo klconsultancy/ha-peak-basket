@@ -333,12 +333,16 @@ the higher house has not occurred for 30 s, about what a consumer needs to act o
 limit anyway (EVCC: ~20 s plus its cache). Pulse on's limit `house + p_min + 200` keeps
 following the appliance's phases, so the load's room stays `p_min + 200` while the house
 cycles. The coordinator keeps, per load, the house each evaluation saw (`house_w`, the
-loads before it and their claims included; fallback left out) and passes the maximum as
-`house_recent_w`; `None` decides on the house of now, as the Jinja macro does. The cost:
+loads before it and their claims included; a fallback without a house does not count)
+and passes the maximum as `house_recent_w`; `None` decides on the house of now, as the
+Jinja macro does. The cost:
 
 - a spike, a kettle for 5 s, can stop a pulsing load as before (it lowers `e_load` by the
   spike times the time left), and the load comes back after 30 s at the earliest, and
   only past the start band;
+- while a recent spike holds continuous off, the load is in pulse at pulse on's limit, so
+  a load running above its minimum is held at its minimum plus 200 W for 30 s after every
+  spike, even with plenty of budget;
 - a load before it that pulses, or a claim that ends, holds a later load down for 30 s too:
   the safe side;
 - while an appliance cycles, the load leaves some of the budget unused.

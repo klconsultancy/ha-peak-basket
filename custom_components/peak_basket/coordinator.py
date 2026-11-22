@@ -407,7 +407,8 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
     def _remember(self, results: dict[str, ModelResult], now: datetime) -> None:
         """Keep each load's mode and house for its next evaluations.
 
-        A fallback's house is unknown: it is kept as ``None`` and does not count.
+        A fallback without a house is kept as ``None`` and does not count; a fallback with
+        one (no used energy) counts, a real measurement and the safe side.
         """
         self._modes = {key: result.mode for key, result in results.items()}
         for key, result in results.items():
