@@ -462,3 +462,46 @@ def test_without_a_pulse_off_before_the_start_is_plain(previous: Mode | None) ->
 def test_from_pulse_off_a_start_needs_the_start_band() -> None:
     assert _after(Mode.PULSE_OFF, START_HOUSE - START_BAND_W + 1) == Mode.PULSE_OFF
     assert _after(Mode.PULSE_OFF, START_HOUSE - START_BAND_W - 1) == Mode.PULSE_ON
+
+
+def _with_recent(house: float, recent: float | None, previous: Mode | None = None) -> ModelResult:
+    """The window start (budget 5400 W on average), no load, a recent house maximum."""
+    return evaluate(
+        ModelInput(
+            target_w=TARGET,
+            seconds_in_window=0,
+            grid_import_w=house,
+            load_w=0,
+            window_import_wh=0,
+            voltages=V3,
+            previous_mode=previous,
+            house_recent_w=recent,
+        ),
+        BE_FLANDERS,
+    )
+
+
+def test_a_recent_higher_house_holds_continuous_off_but_the_limit_follows_now() -> None:
+    """The mode is decided on the highest recent house, the limit on the house of now."""
+    res = _with_recent(GOAL - P_FLOOR - 500, GOAL - P_FLOOR + 600)
+    assert res.mode is Mode.PULSE_ON
+    assert res.limit_w == pytest.approx(GOAL - P_FLOOR - 500 + P_FLOOR)
+    assert res.allowed_load_w == pytest.approx(P_FLOOR)
+
+
+def test_a_recent_higher_house_holds_a_start_off() -> None:
+    res = _with_recent(START_HOUSE - 400, START_HOUSE + 700, Mode.PULSE_OFF)
+    assert res.mode is Mode.PULSE_OFF
+    assert res.limit_w == pytest.approx(START_HOUSE - 400)
+    assert res.charge_minutes == 0
+
+
+@pytest.mark.parametrize("below", [None, 0.0, 1000.0])
+def test_without_a_higher_recent_house_the_mode_is_as_before(below: float | None) -> None:
+    """No recent maximum, or one at or below the house of now: decided as without it."""
+
+    def recent(house: float) -> float | None:
+        return None if below is None else house - below
+
+    assert _with_recent(START_HOUSE - 400, recent(START_HOUSE - 400)).mode is Mode.PULSE_ON
+    assert _with_recent(GOAL - P_FLOOR, recent(GOAL - P_FLOOR)).mode is Mode.CONTINUOUS

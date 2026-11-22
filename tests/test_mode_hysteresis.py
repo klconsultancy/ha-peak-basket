@@ -109,3 +109,31 @@ async def test_the_used_energy_follows_the_grid_between_meter_reports(
     freezer.move_to("2026-11-15T03:15:30+00:00")
     await tick(hass)
     assert float(value(hass, "used")) == pytest.approx(30, abs=0.5)
+
+
+async def test_a_cycling_appliance_holds_the_mode_down_until_it_stops(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    """The house steps 1.1 kW up and down every 5 s around an idle load's start (#92).
+
+    As the hob did at 07:22 on 21/11: 20 s steady below the start, a minute of cycling,
+    then steady again. Down is at once; up waits until the high house has not occurred
+    for 30 s.
+    """
+    low, high = START_HOUSE - 400, START_HOUSE + 700
+    freezer.move_to("2026-11-15T03:14:59+00:00")
+    set_sources(hass, low, 100.0, 0)
+    await setup_entry(hass)
+    start = dt_util.parse_datetime("2026-11-15T03:15:00+00:00")
+    assert start is not None
+    modes = []
+    for k in range(1, 31):
+        cycling = 5 <= k <= 16
+        house = high if cycling and k % 2 else low
+        freezer.move_to(start + timedelta(seconds=5 * k))
+        hass.states.async_set(GRID, str(house), {"unit_of_measurement": "W"})
+        hass.states.async_set(IMPORT, "100.0", {"unit_of_measurement": "kWh"})
+        await tick(hass)
+        modes.append(value(hass, "mode"))
+    # The last high house at 75 s: up at 105 s, the first evaluation 30 s after it.
+    assert modes == ["pulse_on"] * 4 + ["pulse_off"] * 16 + ["pulse_on"] * 10

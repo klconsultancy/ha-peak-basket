@@ -286,14 +286,15 @@ goal   = target - margin
 e_rest = goal x window - used energy           # J left in the basket
 p_avg  = e_rest / max(rest, 1)                 # average allowed for the rest of the window
 p_min  = 6 A x sum(V),  p_max = 16 A x sum(V)
+house_mode = max(house, highest house of this load's last 30 s)   # decides the mode only
 
-if p_avg - house >= p_min + 200:               # CONTINUOUS
+if p_avg - house_mode >= p_min + 200:          # CONTINUOUS
     limit = min(p_avg, house + p_max)
     base  = max(goal, house + p_min + 200)
     last 300 s: limit <= base + extra_a x sum(V)   # no sprint at the end
     last 90 s:  limit <= base
 else:                                          # PULSE
-    e_load    = e_rest - house x rest
+    e_load    = e_rest - house_mode x rest
     p_load    = max(load, p_min)
     threshold = p_load x (reaction + (0 if load > 100 W else min_charge_time))
     threshold += 200 x rest                    if the previous mode was pulse off
@@ -323,6 +324,28 @@ start and stop on it. Stopping stays immediate, the safe side; from pulse off, p
 needs the house the pulse headroom below the start. As a power, the band holds whatever
 the time left. The previous mode is an input (`previous_mode`), so the model stays pure;
 without it (the first evaluation, after fallback) the threshold is plain.
+
+The bands absorb noise, not an appliance that cycles: a hob stepping 1.1 kW up and down
+every 5 s goes right through 200 W. So the **mode** is decided on the highest house of
+the last 30 s (`house_recent_s`), the **limit** on the house of now. A rise takes the mode
+down at once, because the house of now is part of that maximum; the mode goes up only once
+the higher house has not occurred for 30 s, about what a consumer needs to act on a higher
+limit anyway (EVCC: ~20 s plus its cache). Pulse on's limit `house + p_min + 200` keeps
+following the appliance's phases, so the load's room stays `p_min + 200` while the house
+cycles. The coordinator keeps, per load, the house each evaluation saw (`house_w`, the
+loads before it and their claims included; a fallback without a house does not count)
+and passes the maximum as `house_recent_w`; `None` decides on the house of now, as the
+Jinja macro does. The cost:
+
+- a spike, a kettle for 5 s, can stop a pulsing load as before (it lowers `e_load` by the
+  spike times the time left), and the load comes back after 30 s at the earliest, and
+  only past the start band;
+- while a recent spike holds continuous off, the load is in pulse at pulse on's limit, so
+  a load running above its minimum is held at its minimum plus 200 W for 30 s after every
+  spike, even with plenty of budget;
+- a load before it that pulses, or a claim that ends, holds a later load down for 30 s too:
+  the safe side;
+- while an appliance cycles, the load leaves some of the budget unused.
 
 The output is the total grid limit (`limit`), the load's allowed power (`limit - house`),
 the minutes the load can still run, and the basket fields:
@@ -373,6 +396,7 @@ template's output.
 | Reaction time | 90 s | From a lower limit to the load actually dropping (EVCC: ~20 s plus a 30 s cache) |
 | Minimum run time | 300 s | Fewer starts and stops; some cars do not always resume after a long pause |
 | Extra current | 2 A | Damps catching up in the last 5 minutes |
+| House hold (`house_recent_s`, not in the options) | 30 s | A higher house holds the mode down this long, so a cycling appliance does not flip it |
 
 ### Known behaviour
 

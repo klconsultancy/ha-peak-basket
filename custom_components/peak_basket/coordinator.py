@@ -227,6 +227,9 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
         # Each steered load's mode of the previous evaluation, for the band around the
         # continuous boundary.
         self._modes: dict[str, Mode] = {}
+        # Per steered load: the house its evaluations saw over the last house_recent_s,
+        # as the model saw it (the loads before it and their claims included).
+        self._houses: dict[str, deque[tuple[datetime, float | None]]] = {}
         # The window and its import from the meter's average, last taken as it was.
         # With the moment of its report: the import since then is added at the grid power.
         self._average_used: tuple[datetime, float, datetime] | None = None
@@ -340,6 +343,7 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
                     other_loads_w=sum(powers[k + 1 : len(self.steered)]),
                     reserved_w=claimed,
                     previous_mode=self._modes.get(load.subentry_id),
+                    house_recent_w=self._recent_house(load, now),
                 ),
                 self.profile,
                 load.params,
@@ -357,7 +361,7 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
         self._allowed = {
             key: (result.allowed_load_w, result.p_load_min_w) for key, result in results.items()
         }
-        self._modes = {key: result.mode for key, result in results.items()}
+        self._remember(results, now)
         pv = 0.0
         if pv_entity := self._src.get(CONF_PV_POWER):
             # Missing or stale PV counts as 0 W, like a load's power: an inverter that
@@ -392,6 +396,23 @@ class PeakBasketCoordinator(DataUpdateCoordinator[PeakBasketData]):
         if self._must_publish(data, now, force=force):
             self._published_at = now
             self.async_set_updated_data(data)
+
+    def _recent_house(self, load: Load, now: datetime) -> float | None:
+        """Return the highest house this load's evaluations saw over the last house_recent_s."""
+        houses = self._houses.setdefault(load.subentry_id, deque())
+        while houses and houses[0][0] <= now - timedelta(seconds=load.params.house_recent_s):
+            houses.popleft()
+        return max((house for _, house in houses if house is not None), default=None)
+
+    def _remember(self, results: dict[str, ModelResult], now: datetime) -> None:
+        """Keep each load's mode and house for its next evaluations.
+
+        A fallback without a house is kept as ``None`` and does not count; a fallback with
+        one (no used energy) counts, a real measurement and the safe side.
+        """
+        self._modes = {key: result.mode for key, result in results.items()}
+        for key, result in results.items():
+            self._houses.setdefault(key, deque()).append((now, result.house_w))
 
     def _paired(self, powers: list[float], grid: float | None, now: datetime) -> list[float]:
         """Take a grid step since a load's last reading as the load's, within limits.
