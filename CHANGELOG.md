@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.2.0](https://github.com/klconsultancy/ha-peak-basket/compare/v0.1.0...v0.2.0) (2026-11-23)
+
+
+### ⚠ BREAKING CHANGES
+
+* sensor names change. Existing sensors keep their entity IDs; the new IDs (such as `sensor.peak_basket_ev_charger_allowed_power`) apply to new installs and new loads, so rename by hand in Settings → Entities to use them, and update dashboards and EVCC. Reserve now means the safety margin in energy: 0.1.0's house reserve is now Expected import.
+
+### Features
+
+* a load that is only measured, to see its share of the basket ([#74](https://github.com/klconsultancy/ha-peak-basket/issues/74)) ([4193787](https://github.com/klconsultancy/ha-peak-basket/commit/4193787333b7116a53b50a8fa55e70f669a6f664))
+* a load's device links to the appliance it measures and takes its area ([#81](https://github.com/klconsultancy/ha-peak-basket/issues/81)) ([55d063d](https://github.com/klconsultancy/ha-peak-basket/commit/55d063dc34264845280b395f376c09032bfe74de))
+* one language for names, one entity-ID convention, and a power sensor per load ([#80](https://github.com/klconsultancy/ha-peak-basket/issues/80)) ([4fb4379](https://github.com/klconsultancy/ha-peak-basket/commit/4fb43793c7ce22f9b9feb1afb6b80419c428d852))
+
+
+### Bug Fixes
+
+* a cycling house appliance no longer flips the mode ([#92](https://github.com/klconsultancy/ha-peak-basket/issues/92)) ([#94](https://github.com/klconsultancy/ha-peak-basket/issues/94)) ([64ca8da](https://github.com/klconsultancy/ha-peak-basket/commit/64ca8da17514ad6097cbd6f413ab49ee3933b257))
+* a load sensor that lags the grid power no longer reads as a house step ([#85](https://github.com/klconsultancy/ha-peak-basket/issues/85)) ([be074d9](https://github.com/klconsultancy/ha-peak-basket/commit/be074d9f53f39bccd6a08411d2945dafce77a6c4))
+* continuous never offers a load less than pulse on ([#91](https://github.com/klconsultancy/ha-peak-basket/issues/91)) ([#93](https://github.com/klconsultancy/ha-peak-basket/issues/93)) ([0db0c59](https://github.com/klconsultancy/ha-peak-basket/commit/0db0c5961d81a1e50ea3bd7d81afea3f716a7965))
+* replace the deprecated device_registry.async_get_device lookup ([#84](https://github.com/klconsultancy/ha-peak-basket/issues/84)) ([296a8fb](https://github.com/klconsultancy/ha-peak-basket/commit/296a8fbd774b8f77f4f03bfe5d5c30aae358d2c3))
+* the mode does not flip around an idle load's start ([#90](https://github.com/klconsultancy/ha-peak-basket/issues/90)) ([cb180e2](https://github.com/klconsultancy/ha-peak-basket/commit/cb180e2f14ffd86b41814a799be6cb36fde232a3))
+* the mode does not flip on every evaluation around the continuous boundary ([#86](https://github.com/klconsultancy/ha-peak-basket/issues/86)) ([88ce71e](https://github.com/klconsultancy/ha-peak-basket/commit/88ce71ee1d35f8afa0ad7aaa97eb0842210f9fd1))
+* the Wants power help text no longer says it only matters with more than one load ([#89](https://github.com/klconsultancy/ha-peak-basket/issues/89)) ([6aa87e2](https://github.com/klconsultancy/ha-peak-basket/commit/6aa87e2b78cf0de03fbabb6563aaa80dee56cf8a))
+
 ## 0.1.0 (2026-11-16)
 
 
