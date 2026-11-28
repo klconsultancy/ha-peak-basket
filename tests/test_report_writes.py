@@ -8,8 +8,10 @@ reader of their history needs it.
 
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
+from unittest.mock import patch
 
 import pytest
 from homeassistant.core import Event, EventStateChangedData, callback
@@ -17,6 +19,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.event import async_track_state_change_event
 
 from custom_components.peak_basket.const import DOMAIN
+from custom_components.peak_basket.sensor import _Sensor
 
 from .conftest import AVERAGE, EV, GRID, LOAD_KEYS, SOURCES, setup_entry, tick
 
@@ -132,3 +135,23 @@ async def test_a_report_sensor_writes_at_once_when_its_value_goes_unknown_and_ba
     await _step(hass, freezer, start + timedelta(seconds=10), 2000)
     assert [(at - start).total_seconds() for at, state in rows["used"]] == [5, 10]
     assert rows["used"][0][1] == "unknown"
+
+
+async def test_an_update_while_a_sensor_restores_is_handled(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory, caplog: pytest.LogCaptureFixture
+) -> None:
+    """The coordinator listener is registered before the restore awaits Home Assistant.
+
+    An evaluation published in between reaches a report sensor that has not been written
+    yet: it must find when it was added. The coordinator would only log the failure, and
+    the update would be lost.
+    """
+
+    async def publish_meanwhile(sensor: _Sensor) -> None:
+        await asyncio.sleep(0)
+        sensor.coordinator.async_update_listeners()
+
+    with patch.object(_Sensor, "async_get_last_extra_data", publish_meanwhile):
+        await _setup(hass, freezer, datetime(2026, 11, 15, 3, 5, tzinfo=UTC))
+    assert hass.states.get(_entity_id(hass, "load_grid")) is not None
+    assert "Unexpected error updating listener" not in caplog.text

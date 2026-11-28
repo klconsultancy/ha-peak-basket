@@ -417,8 +417,10 @@ class _Sensor(CoordinatorEntity[PeakBasketCoordinator], RestoreEntity, SensorEnt
     _attr_has_entity_name = True
     entity_description: ConnectionSensorDescription | LoadSensorDescription
     _subentry_id: str | None = None
-    # The last write: when, the window of its value, and whether it had one. Set before the
-    # coordinator listener is registered, so an update never finds it missing.
+    # The last write: when, the window of its value, and whether it had one. The first is
+    # the moment the sensor is added, set before the coordinator listener is registered so
+    # an update never finds it missing; should the restore make the value known by the
+    # first write, the next tick writes once more.
     _written: tuple[datetime, datetime | None, bool]
 
     @property
