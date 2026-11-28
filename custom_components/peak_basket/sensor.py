@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from contextlib import suppress
 from dataclasses import dataclass, replace
-from typing import TYPE_CHECKING
+from datetime import datetime, timedelta
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -13,14 +14,22 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.const import EntityCategory, UnitOfEnergy, UnitOfPower, UnitOfTime
+from homeassistant.core import callback
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
-from homeassistant.helpers.restore_state import RestoreEntity
+from homeassistant.helpers.restore_state import ExtraStoredData, RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util import dt as dt_util
 from homeassistant.util import slugify
 
-from .const import CONF_GRID_EXPORT_ENERGY, CONF_PV_POWER, DOMAIN
+from .const import (
+    CONF_GRID_EXPORT_ENERGY,
+    CONF_PV_POWER,
+    DOMAIN,
+    REPORT_SECONDS,
+    TICK_SECONDS,
+)
 from .coordinator import PeakBasketConfigEntry, PeakBasketCoordinator, floor_power
 from .model import Mode
 
@@ -43,6 +52,8 @@ class ConnectionSensorDescription(SensorEntityDescription):
     value_fn: Callable[[PeakBasketCoordinator], float | None]
     restore: bool = False
     """Hand the last value back to the coordinator after a restart, within its window."""
+    report: bool = False
+    """Written at most every REPORT_SECONDS and at the window's edges; see _Sensor."""
     house: bool = False
     """Shown on the house's device rather than the connection's."""
 
@@ -55,6 +66,8 @@ class LoadSensorDescription(SensorEntityDescription):
     """From the latest evaluation and the load's subentry id."""
     restore: bool = False
     """Hand the last value back to the coordinator after a restart, within its window."""
+    report: bool = False
+    """Written at most every REPORT_SECONDS and at the window's edges; see _Sensor."""
 
 
 # The entity ID's suffix per key: the slug of the sensor's English name, the same in every
@@ -125,6 +138,7 @@ CONNECTION_SENSORS: tuple[ConnectionSensorDescription, ...] = (
             entity_category=category,
             value_fn=fn,
             house=key == "house_reserve",
+            report=True,
         )
         for key, fn, category in (
             ("basket", lambda c: _wh(c.data.connection.basket_wh), None),
@@ -171,6 +185,7 @@ LOAD_SENSORS: tuple[LoadSensorDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=0,
         value_fn=lambda d, i: round(d.loads[i].charge_minutes),
+        report=True,
     ),
     LoadSensorDescription(
         key="load_room",
@@ -179,6 +194,7 @@ LOAD_SENSORS: tuple[LoadSensorDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=0,
         value_fn=lambda d, i: _wh(d.loads[i].load_room_wh),
+        report=True,
     ),
 )
 
@@ -191,6 +207,7 @@ LOAD_POWER = LoadSensorDescription(
     native_unit_of_measurement=UnitOfPower.WATT,
     state_class=SensorStateClass.MEASUREMENT,
     value_fn=lambda d, i: _w(d.powers.get(i)),
+    report=True,
 )
 
 # A measured-only load's expected import: its only basket figure, so not diagnostic.
@@ -201,6 +218,7 @@ LOAD_RESERVE = LoadSensorDescription(
     state_class=SensorStateClass.MEASUREMENT,
     suggested_display_precision=0,
     value_fn=lambda d, i: _wh(d.reserves.get(i)),
+    report=True,
 )
 
 
@@ -215,6 +233,7 @@ def _energy_sensor[D: (ConnectionSensorDescription, LoadSensorDescription)](
         suggested_display_precision=0,
         value_fn=value_fn,
         restore=restore,
+        report=True,
     )
 
 
@@ -363,10 +382,103 @@ def _load_device(
     return info
 
 
-class ConnectionSensor(CoordinatorEntity[PeakBasketCoordinator], RestoreEntity, SensorEntity):
-    """One value of the grid connection's basket, or of the house."""
+@dataclass
+class WindowSum(ExtraStoredData):
+    """A sum and the start of the window it belongs to, kept for a restart."""
+
+    wh: float
+    window: datetime
+
+    def as_dict(self) -> dict[str, Any]:
+        """Return the sum and its window as JSON."""
+        return {"wh": self.wh, "window": self.window.isoformat()}
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> WindowSum | None:
+        """Return the saved sum, or None when it is not one."""
+        try:
+            return cls(float(data["wh"]), datetime.fromisoformat(data["window"]))
+        except KeyError, TypeError, ValueError:
+            return None
+
+
+class _Sensor(CoordinatorEntity[PeakBasketCoordinator], RestoreEntity, SensorEntity):
+    """What a connection's and a load's sensor share: when to write, and the restore.
+
+    A control sensor writes on every published evaluation. A report sensor writes only
+    when its history needs it, since every written change is a recorder row (#95): after
+    REPORT_SECONDS, in the window's last tick (so the last row before the reset is the
+    window's total), on the first evaluation of a new window, and when it goes unknown or
+    comes back. Its native_value is always current; only what is written is recorded.
+    """
 
     _attr_has_entity_name = True
+    entity_description: ConnectionSensorDescription | LoadSensorDescription
+    _subentry_id: str | None = None
+    # The last write: when, the window of its value, and whether it had one. Set when the
+    # sensor is added; coordinator updates only come after that.
+    _written: tuple[datetime, datetime | None, bool]
+
+    @property
+    def available(self) -> bool:
+        """Unavailable until the coordinator published its first evaluation."""
+        return super().available and self.coordinator.data is not None
+
+    def _window(self) -> datetime | None:
+        return self.coordinator.data.window if self.coordinator.data is not None else None
+
+    def _known(self) -> bool:
+        return self.available and self.native_value is not None
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        if self.entity_description.report and not self._report_due():
+            return
+        super()._handle_coordinator_update()
+        self._written = (dt_util.now(), self._window(), self._known())
+
+    def _report_due(self) -> bool:
+        at, window, known = self._written
+        now = dt_util.now()
+        current = self._window()
+        end = (current or now) + timedelta(seconds=self.coordinator.profile.window_s)
+        return (
+            current != window
+            or self._known() != known
+            or (end - now).total_seconds() <= TICK_SECONDS
+            or now - at >= timedelta(seconds=REPORT_SECONDS)
+        )
+
+    @property
+    def extra_restore_state_data(self) -> WindowSum | None:
+        """Return the sum as it is now and its window, when the restore state is saved.
+
+        Taken at the moment Home Assistant saves (every 15 min and on stop), not from the
+        last written state, which for a report sensor can be 30 s old.
+        """
+        value, window = self.native_value, self._window()
+        if (
+            not self.entity_description.restore
+            or window is None
+            or not isinstance(value, float | int)
+        ):
+            return None
+        return WindowSum(float(value), window)
+
+    async def async_added_to_hass(self) -> None:
+        """Hand a sum from before a restart back to the coordinator.
+
+        Home Assistant writes the state right after this: that is the first write.
+        """
+        await super().async_added_to_hass()
+        if self.entity_description.restore:
+            await _restore(self, self._subentry_id)
+        self._written = (dt_util.now(), self._window(), self._known())
+
+
+class ConnectionSensor(_Sensor):
+    """One value of the grid connection's basket, or of the house."""
+
     entity_description: ConnectionSensorDescription
 
     def __init__(
@@ -390,27 +502,16 @@ class ConnectionSensor(CoordinatorEntity[PeakBasketCoordinator], RestoreEntity, 
         self.entity_id = f"sensor.{DOMAIN}_{device}{SUFFIXES[description.key]}"
 
     @property
-    def available(self) -> bool:
-        """Unavailable until the coordinator published its first evaluation."""
-        return super().available and self.coordinator.data is not None
-
-    @property
     def native_value(self) -> float | None:
         """Return the value from the latest evaluation."""
         return self.entity_description.value_fn(self.coordinator)
 
-    async def async_added_to_hass(self) -> None:
-        """Hand a sum from before a restart back to the coordinator."""
-        await super().async_added_to_hass()
-        if self.entity_description.restore:
-            await _restore(self, None)
 
-
-class LoadSensor(CoordinatorEntity[PeakBasketCoordinator], RestoreEntity, SensorEntity):
+class LoadSensor(_Sensor):
     """One value of a load's decision."""
 
-    _attr_has_entity_name = True
     entity_description: LoadSensorDescription
+    _subentry_id: str
 
     def __init__(
         self,
@@ -430,27 +531,21 @@ class LoadSensor(CoordinatorEntity[PeakBasketCoordinator], RestoreEntity, Sensor
         self.entity_id = f"sensor.{DOMAIN}_{load_slug(load.title)}_{SUFFIXES[description.key]}"
 
     @property
-    def available(self) -> bool:
-        """Unavailable until the coordinator published its first evaluation."""
-        return super().available and self.coordinator.data is not None
-
-    @property
     def native_value(self) -> float | str | None:
         """Return the value from the latest evaluation."""
         return self.entity_description.value_fn(self.coordinator.data, self._subentry_id)
 
-    async def async_added_to_hass(self) -> None:
-        """Hand a sum from before a restart back to the coordinator."""
-        await super().async_added_to_hass()
-        if self.entity_description.restore:
-            await _restore(self, self._subentry_id)
 
-
-async def _restore(sensor: ConnectionSensor | LoadSensor, subentry_id: str | None) -> None:
+async def _restore(sensor: _Sensor, subentry_id: str | None) -> None:
+    key = sensor.entity_description.key
+    extra = await sensor.async_get_last_extra_data()
+    saved = WindowSum.from_dict(extra.as_dict()) if extra is not None else None
+    if saved is not None:
+        sensor.coordinator.restore(key, subentry_id, saved.wh, saved.window)
+        return
+    # Saved before 0.2.1: the written state, at the moment it was written.
     last = await sensor.async_get_last_state()
     if last is None:
         return
     with suppress(ValueError):
-        sensor.coordinator.restore(
-            sensor.entity_description.key, subentry_id, float(last.state), last.last_updated
-        )
+        sensor.coordinator.restore(key, subentry_id, float(last.state), last.last_updated)

@@ -54,6 +54,16 @@ def auto_enable_custom_integrations(enable_custom_integrations: None) -> None:
     """Let Home Assistant load custom_components/ in every test."""
 
 
+@pytest.fixture(autouse=True)
+def report_on_every_publish(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Write the report sensors on every published evaluation, as the control ones.
+
+    Most tests read a window's sums right after an evaluation; when a report sensor writes
+    is tested on its own, in test_report_writes.py, which overrides this fixture.
+    """
+    monkeypatch.setattr("custom_components.peak_basket.sensor.REPORT_SECONDS", 0)
+
+
 def set_sources(
     hass: HomeAssistant, grid_w: float, import_kwh: float | str, ev_w: float | str
 ) -> None:
