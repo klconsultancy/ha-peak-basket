@@ -9,7 +9,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from homeassistant.core import State
 from homeassistant.helpers import entity_registry as er
-from pytest_homeassistant_custom_component.common import MockConfigEntry, mock_restore_cache
+from homeassistant.helpers.restore_state import async_get as restore_state
+from pytest_homeassistant_custom_component.common import (
+    MockConfigEntry,
+    mock_restore_cache,
+    mock_restore_cache_with_extra_data,
+)
 
 from custom_components.peak_basket.const import DOMAIN
 
@@ -207,8 +212,13 @@ def _entry_with_pv(hass: HomeAssistant) -> MockConfigEntry:
 
 
 def _restore(
-    hass: HomeAssistant, entry: MockConfigEntry, saved: dict[str, str], at: datetime
+    hass: HomeAssistant,
+    entry: MockConfigEntry,
+    saved: dict[str, str],
+    at: datetime,
+    extra: dict[str, dict[str, Any]] | None = None,
 ) -> None:
+    """Put states saved at ``at`` in the restore cache, with each one's extra data."""
     registry = er.async_get(hass)
     states = []
     for key, saved_value in saved.items():
@@ -226,8 +236,11 @@ def _restore(
             suggested_object_id=key,
         ).entity_id
         state = State(entity_id, saved_value, last_updated=at, last_changed=at)
-        states.append(state)
-    mock_restore_cache(hass, states)
+        states.append((state, (extra or {}).get(key)))
+    if extra is None:
+        mock_restore_cache(hass, [state for state, _ in states])
+    else:
+        mock_restore_cache_with_extra_data(hass, states)
 
 
 async def test_restart_mid_window_keeps_the_window_so_far(
@@ -257,6 +270,74 @@ async def test_restart_does_not_restore_an_earlier_window(
     await _at(hass, freezer, "2026-11-15T12:21:36+00:00", grid=-500, ev=2000, pv=3000)
     assert float(value(hass, "solar")) == 30
     assert float(value(hass, "load_grid")) == 0
+
+
+async def test_restart_restores_the_sum_as_it_was_when_saved(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    """A report sensor's written state can be 30 s old: the saved sum is not (#95).
+
+    Home Assistant saves a sensor's extra data when it stops, from the entity as it is
+    then. Its window says which window the sum belongs to, whatever the written state's
+    time: here the state was last written in the previous window.
+    """
+    entry = _entry_with_pv(hass)
+    written_at = datetime(2026, 11, 15, 12, 14, 50, tzinfo=UTC)
+    window = {"window": "2026-11-15T12:15:00+00:00"}
+    _restore(
+        hass,
+        entry,
+        {"solar": "290", "load_solar": "190", "load_grid": "40"},
+        written_at,
+        extra={
+            "solar": {"wh": 300.0, **window},
+            "load_solar": {"wh": 200.0, **window},
+            "load_grid": {"wh": 50.0, **window},
+        },
+    )
+    await _at(hass, freezer, "2026-11-15T12:21:00+00:00", grid=-500, ev=2000, pv=3000)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    await _at(hass, freezer, "2026-11-15T12:21:36+00:00", grid=-500, ev=2000, pv=3000)
+    assert float(value(hass, "solar")) == 330
+    assert float(value(hass, "load_solar")) == 220
+    assert float(value(hass, "load_grid")) == 50
+
+
+async def test_saved_extra_data_that_is_not_a_sum_falls_back_to_the_state(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    entry = _entry_with_pv(hass)
+    saved_at = datetime(2026, 11, 15, 12, 20, tzinfo=UTC)
+    _restore(hass, entry, {"solar": "300"}, saved_at, extra={"solar": {"wh": "x"}})
+    await _at(hass, freezer, "2026-11-15T12:21:00+00:00", grid=-500, ev=2000, pv=3000)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    await _at(hass, freezer, "2026-11-15T12:21:36+00:00", grid=-500, ev=2000, pv=3000)
+    assert float(value(hass, "solar")) == 330
+
+
+async def test_the_saved_sum_carries_its_own_window(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    """Saved right after the boundary, before an evaluation: the sum is still the old
+    window's, and its window says so."""
+    await _at(hass, freezer, "2026-11-15T12:14:20+00:00", grid=-500, ev=2000, pv=3000)
+    await setup_entry(hass, _sources(pv_power=PV))
+    await _at(hass, freezer, "2026-11-15T12:14:56+00:00", grid=-500, ev=2000, pv=3000)
+    freezer.move_to("2026-11-15T12:15:01+00:00")
+    stored = {
+        s.state.entity_id: s.extra_data.as_dict()
+        for s in restore_state(hass).async_get_stored_states()
+        if s.extra_data is not None
+    }
+    (entry,) = hass.config_entries.async_entries(DOMAIN)
+    solar = er.async_get(hass).async_get_entity_id("sensor", DOMAIN, f"{entry.entry_id}_solar")
+    assert solar is not None
+    assert stored[solar] == {"wh": 30.0, "window": "2026-11-15T12:00:00+00:00"}
+    # A sensor that is not restored saves no sum.
+    used = er.async_get(hass).async_get_entity_id("sensor", DOMAIN, f"{entry.entry_id}_used")
+    assert used not in stored
 
 
 async def test_an_interval_across_the_boundary_counts_its_part_in_the_new_window(

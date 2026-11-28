@@ -81,8 +81,12 @@ sensors exist only with a PV source; the export sensor with a PV source or an ex
 register.
 
 After a restart the sums the coordinator adds up itself (each load's grid and solar,
-solar, and export from grid power) come back from the sensors' last states when those
-are from the running window. The rest follows from the meter.
+solar, and export from grid power) come back when they are from the running window. Each
+of these sensors saves its sum with the start of its window as extra restore data, which
+Home Assistant takes from the entity when it saves (every 15 minutes and on stop), not from
+the last written state: a report sensor's state can be 30 s old (see *Publishing*), its
+saved sum is not. A sum saved before 0.2.1 has no extra data and comes back from the last
+state and its time, as before. The rest follows from the meter.
 
 ## Rules
 
@@ -370,6 +374,25 @@ powers are published rounded down to 10 W (never above the model's value), energ
 1 Wh and minutes to whole minutes. The model runs on every grid-power update, but the
 sensors change at most once per 5 s tick, except when the mode changes or the grid limit
 or the load's allowed power goes down: those are published at once.
+
+What a sensor is for decides how often it writes. The **control** sensors (allowed power,
+grid limit, mode, peak limit, and the house's power, the model's input that most of the
+diagnosis runs on) write on every published evaluation. The **report** sensors (the
+window's energy sums, a load's power, the minutes left, the budget available) write at
+most every 30 s (`REPORT_SECONDS`), and also:
+
+- in the window's last 5 s tick, so the last row before the reset is the window's total;
+- on the first evaluation of a new window, so its reset to about 0 is a row;
+- when the value goes unknown or comes back.
+
+Between writes the state, which every reader sees (automations, templates, a dashboard
+tile of the budget left) and the recorder stores, keeps the last written value, up to
+30 s old; only the entity's own value and its saved restore data are current. Nothing
+steers on these sensors, so that is the price: report rows drop about sixfold, and their
+history has a point every 30 s, with exact per-window totals. A sensor states its kind where it is defined
+(`report=True`); without the flag it is control, the safe side. An evaluation stalled
+across the boundary (a restart, a slow recorder) lets no tick land in the window's last
+5 s, so that window's final value is not written: rare, and the same loss as before.
 
 **Start-up.** Right after a Home Assistant restart the meter's integration may not have
 written a state yet. The fallback would then publish 0 W allowed power, which stops a load
