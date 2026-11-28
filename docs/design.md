@@ -385,9 +385,11 @@ most every 30 s (`REPORT_SECONDS`), and also:
 - on the first evaluation of a new window, so its reset to about 0 is a row;
 - when the value goes unknown or comes back.
 
-Their value in the state machine is still current between writes, but only what is
-written is recorded: report rows drop about sixfold, and their history has a point every
-30 s, with exact per-window totals. A sensor states its kind where it is defined
+Between writes the state, which every reader sees (automations, templates, a dashboard
+tile of the budget left) and the recorder stores, keeps the last written value, up to
+30 s old; only the entity's own value and its saved restore data are current. Nothing
+steers on these sensors, so that is the price: report rows drop about sixfold, and their
+history has a point every 30 s, with exact per-window totals. A sensor states its kind where it is defined
 (`report=True`); without the flag it is control, the safe side. An evaluation stalled
 across the boundary (a restart, a slow recorder) lets no tick land in the window's last
 5 s, so that window's final value is not written: rare, and the same loss as before.

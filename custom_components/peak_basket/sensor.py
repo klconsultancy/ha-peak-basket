@@ -409,14 +409,16 @@ class _Sensor(CoordinatorEntity[PeakBasketCoordinator], RestoreEntity, SensorEnt
     when its history needs it, since every written change is a recorder row (#95): after
     REPORT_SECONDS, in the window's last tick (so the last row before the reset is the
     window's total), on the first evaluation of a new window, and when it goes unknown or
-    comes back. Its native_value is always current; only what is written is recorded.
+    comes back. Between writes, the state (what every reader sees and the recorder
+    stores) keeps the last written value; only native_value and the restore data are
+    current.
     """
 
     _attr_has_entity_name = True
     entity_description: ConnectionSensorDescription | LoadSensorDescription
     _subentry_id: str | None = None
-    # The last write: when, the window of its value, and whether it had one. Set when the
-    # sensor is added; coordinator updates only come after that.
+    # The last write: when, the window of its value, and whether it had one. Set before the
+    # coordinator listener is registered, so an update never finds it missing.
     _written: tuple[datetime, datetime | None, bool]
 
     @property
@@ -470,10 +472,10 @@ class _Sensor(CoordinatorEntity[PeakBasketCoordinator], RestoreEntity, SensorEnt
 
         Home Assistant writes the state right after this: that is the first write.
         """
+        self._written = (dt_util.now(), self._window(), self._known())
         await super().async_added_to_hass()
         if self.entity_description.restore:
             await _restore(self, self._subentry_id)
-        self._written = (dt_util.now(), self._window(), self._known())
 
 
 class ConnectionSensor(_Sensor):
