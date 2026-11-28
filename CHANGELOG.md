@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/klconsultancy/ha-peak-basket/compare/v0.2.0...v0.2.1) (2026-11-28)
+
+
+### Bug Fixes
+
+* report sensors write at most every 30 s and at the window's edges ([#95](https://github.com/klconsultancy/ha-peak-basket/issues/95)) ([#96](https://github.com/klconsultancy/ha-peak-basket/issues/96)) ([b000c2e](https://github.com/klconsultancy/ha-peak-basket/commit/b000c2ebab4b2ba648844510b14d4034408461f5))
+
 ## [0.2.0](https://github.com/klconsultancy/ha-peak-basket/compare/v0.1.0...v0.2.0) (2026-11-23)
 
 
